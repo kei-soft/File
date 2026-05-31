@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Schwarzschild — 블랙홀 시뮬레이션</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo+Mono:wght@300;400;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#05060a;
+    --ink:#e8eef7;
+    --dim:#76829a;
+    --line:rgba(140,160,200,0.14);
+    --panel:rgba(10,13,22,0.72);
+    --amber:#ffb454;
+    --cyan:#5ad6ff;
+    --hot:#fff2d6;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;overflow:hidden;background:var(--bg);}
+  body{
+    font-family:'IBM Plex Sans KR',sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    cursor:grab;
+    touch-action:none;
+  }
+  body.dragging{cursor:grabbing;}
+  #gl{position:fixed;inset:0;display:block;width:100%;height:100%;}
+
+  /* ---------- Title ---------- */
+  .title{
+    position:fixed;top:26px;left:30px;z-index:10;pointer-events:none;
+    mix-blend-mode:screen;
+  }
+  .title .kicker{
+    font-family:'Chivo Mono',monospace;font-weight:400;font-size:11px;
+    letter-spacing:.42em;color:var(--amber);text-transform:uppercase;
+    margin-bottom:6px;opacity:.9;
+  }
+  .title h1{
+    font-family:'Chivo Mono',monospace;font-weight:300;
+    font-size:clamp(28px,5vw,46px);letter-spacing:.02em;line-height:.95;
+    color:var(--hot);
+  }
+  .title h1 b{font-weight:600;color:#fff;}
+  .title .sub{
+    margin-top:8px;font-size:12px;color:var(--dim);max-width:300px;line-height:1.5;
+  }
+
+  /* ---------- Control panel ---------- */
+  .panel{
+    position:fixed;top:24px;right:24px;z-index:20;width:288px;
+    background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 24px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.05);
+    overflow:hidden;
+  }
+  .panel-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 16px;border-bottom:1px solid var(--line);
+    cursor:pointer;user-select:none;
+  }
+  .panel-head .lbl{font-family:'Chivo Mono',monospace;font-size:11px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase;}
+  .panel-head .dot{width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 10px var(--amber);animation:pulse 2.6s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:.45;transform:scale(.85);}50%{opacity:1;transform:scale(1.15);}}
+  .panel-head .chev{color:var(--dim);font-family:'Chivo Mono',monospace;transition:transform .3s;}
+  .panel.collapsed .panel-body{max-height:0;opacity:0;padding-top:0;padding-bottom:0;}
+  .panel.collapsed .chev{transform:rotate(-90deg);}
+  .panel-body{
+    max-height:640px;opacity:1;transition:max-height .42s cubic-bezier(.4,0,.2,1),opacity .3s;
+    padding:6px 16px 16px;overflow:hidden;
+  }
+
+  .ctrl{margin-top:16px;}
+  .ctrl .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+  .ctrl label{font-size:12px;color:var(--ink);font-weight:400;letter-spacing:.01em;}
+  .ctrl .val{font-family:'Chivo Mono',monospace;font-size:11px;color:var(--amber);letter-spacing:.04em;}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:2px;
+    background:linear-gradient(90deg,var(--amber) var(--p,50%),rgba(255,255,255,.12) var(--p,50%));
+    border-radius:2px;outline:none;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+    background:var(--hot);border:2px solid var(--bg);
+    box-shadow:0 0 0 1px var(--amber),0 0 12px rgba(255,180,84,.6);cursor:grab;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:13px;height:13px;border-radius:50%;background:var(--hot);
+    border:2px solid var(--bg);box-shadow:0 0 0 1px var(--amber);cursor:grab;
+  }
+
+  .toggles{display:flex;gap:8px;margin-top:18px;}
+  .toggles button{
+    flex:1;font-family:'Chivo Mono',monospace;font-size:10px;letter-spacing:.12em;
+    padding:9px 4px;border-radius:8px;border:1px solid var(--line);
+    background:rgba(255,255,255,.02);color:var(--dim);cursor:pointer;
+    transition:all .2s;text-transform:uppercase;
+  }
+  .toggles button.on{
+    background:rgba(255,180,84,.14);border-color:rgba(255,180,84,.5);
+    color:var(--amber);box-shadow:inset 0 0 16px rgba(255,180,84,.08);
+  }
+
+  .readout{
+    margin-top:18px;padding-top:14px;border-top:1px solid var(--line);
+    font-family:'Chivo Mono',monospace;font-size:10.5px;color:var(--dim);
+    line-height:1.7;letter-spacing:.03em;
+  }
+  .readout span{color:var(--cyan);}
+
+  /* ---------- Hint ---------- */
+  .hint{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:10;
+    font-family:'Chivo Mono',monospace;font-size:11px;letter-spacing:.12em;
+    color:var(--dim);text-transform:uppercase;pointer-events:none;
+    display:flex;gap:22px;opacity:.8;
+  }
+  .hint b{color:var(--ink);font-weight:400;}
+  @media (max-width:680px){
+    .title{left:18px;top:18px;}
+    .panel{right:12px;left:12px;top:auto;bottom:74px;width:auto;}
+    .hint{font-size:9px;gap:12px;bottom:14px;}
+  }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div class="title">
+  <div class="kicker">Schwarzschild Metric · Real-time Ray Tracer</div>
+  <h1>블랙<b>홀</b></h1>
+  <div class="sub">광자 측지선을 적분해 휘어지는 빛, 강착원반, 도플러 빔잉을 실시간 계산합니다.</div>
+</div>
+
+<div class="panel" id="panel">
+  <div class="panel-head" id="panelHead">
+    <span class="lbl">제어판 / Controls</span>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="dot"></span><span class="chev">▾</span>
+    </div>
+  </div>
+  <div class="panel-body">
+    <div class="ctrl">
+      <div class="row"><label>중력 렌즈 강도 (질량)</label><span class="val" id="vMass">1.00×</span></div>
+      <input type="range" id="mass" min="0.2" max="2.4" step="0.01" value="1.0">
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>강착원반 밝기</label><span class="val" id="vBright">1.0</span></div>
+      <input type="range" id="bright" min="0" max="2.5" step="0.01" value="1.2">
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>원반 회전 속도</label><span class="val" id="vSpin">1.0×</span></div>
+      <input type="range" id="spin" min="0" max="3" step="0.01" value="1.0">
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>관측 거리</label><span class="val" id="vDist">14.0</span></div>
+      <input type="range" id="dist" min="6" max="30" step="0.1" value="14">
+    </div>
+
+    <div class="toggles">
+      <button id="tDisk" class="on">DISK</button>
+      <button id="tStars" class="on">STARS</button>
+      <button id="tQual">HI-RES</button>
+    </div>
+
+    <div class="readout">
+      r<sub>s</sub> (사건의 지평선) = <span>1.00 GM/c²</span><br>
+      광자 구 (photon sphere) = <span>1.50 r<sub>s</sub></span><br>
+      ISCO (최소 안정 궤도) = <span>3.00 r<sub>s</sub></span>
+    </div>
+  </div>
+</div>
+
+<div class="hint">
+  <span><b>드래그</b> 궤도 회전</span>
+  <span><b>스크롤</b> 줌</span>
+  <span><b>더블클릭</b> 시점 리셋</span>
+</div>
+
+<script>
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+if(!gl){ document.body.innerHTML = '<p style="color:#fff;padding:40px;font-family:monospace">이 브라우저는 WebGL을 지원하지 않습니다.</p>'; }
+
+/* ---------- Shaders ---------- */
+const vsSrc = `
+attribute vec2 aPos;
+void main(){ gl_Position = vec4(aPos,0.0,1.0); }
+`;
+
+const fsSrc = `
+precision highp float;
+uniform vec2  uRes;
+uniform float uTime;
+uniform vec3  uCamPos;
+uniform vec3  uCamFwd;
+uniform vec3  uCamRight;
+uniform vec3  uCamUp;
+uniform float uMass;       // gravitational strength multiplier
+uniform float uBright;     // disk brightness
+uniform float uSpin;       // disk rotation speed
+uniform float uShowDisk;   // 0/1
+uniform float uShowStars;  // 0/1
+
+const float PI = 3.14159265;
+const float Rs = 1.0;          // event horizon radius (geometric units)
+const float DISK_IN  = 2.6;
+const float DISK_OUT = 9.0;
+
+// --- hashing ---
+float hash13(vec3 p){
+  p = fract(p*0.1031);
+  p += dot(p, p.yzx + 33.33);
+  return fract((p.x + p.y) * p.z);
+}
+float hash12(vec2 p){
+  vec3 p3 = fract(vec3(p.xyx)*0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y)*p3.z);
+}
+float vnoise(vec3 p){
+  vec3 i = floor(p); vec3 f = fract(p);
+  f = f*f*(3.0-2.0*f);
+  float n000=hash13(i+vec3(0,0,0)), n100=hash13(i+vec3(1,0,0));
+  float n010=hash13(i+vec3(0,1,0)), n110=hash13(i+vec3(1,1,0));
+  float n001=hash13(i+vec3(0,0,1)), n101=hash13(i+vec3(1,0,1));
+  float n011=hash13(i+vec3(0,1,1)), n111=hash13(i+vec3(1,1,1));
+  float x00=mix(n000,n100,f.x), x10=mix(n010,n110,f.x);
+  float x01=mix(n001,n101,f.x), x11=mix(n011,n111,f.x);
+  return mix(mix(x00,x10,f.y), mix(x01,x11,f.y), f.z);
+}
+
+// --- starfield + faint nebula on a direction ---
+vec3 background(vec3 dir){
+  if(uShowStars < 0.5) return vec3(0.0);
+  vec3 col = vec3(0.0);
+  // three layers of stars
+  for(int k=0;k<3;k++){
+    float sc = 60.0 + float(k)*90.0;
+    vec3 p = dir*sc;
+    vec3 id = floor(p);
+    float h = hash13(id);
+    float bright = smoothstep(0.985 - float(k)*0.004, 1.0, h);
+    if(bright>0.0){
+      vec3 c = floor(p)+0.5;
+      float d = length(fract(p)-0.5);
+      float star = bright * smoothstep(0.5,0.0,d);
+      float tw = 0.7 + 0.3*sin(uTime*2.0 + h*40.0);
+      // slight color variety
+      vec3 tint = mix(vec3(0.7,0.8,1.0), vec3(1.0,0.85,0.7), hash13(id+7.0));
+      col += star*tw*tint*(1.2-float(k)*0.3);
+    }
+  }
+  // soft nebula
+  float n = vnoise(dir*3.0 + 10.0);
+  n = pow(n,3.0);
+  vec3 neb = mix(vec3(0.02,0.03,0.07), vec3(0.10,0.05,0.12), vnoise(dir*1.5));
+  col += neb * n * 0.6;
+  col += vec3(0.006,0.008,0.014); // base sky
+  return col;
+}
+
+// --- accretion disk color at radius r ---
+vec3 diskColor(float r, vec3 hitPos, vec3 viewDir){
+  float t = clamp((DISK_OUT - r)/(DISK_OUT - DISK_IN), 0.0, 1.0); // 1 inner .. 0 outer
+  // temperature ramp: hot blue-white inner -> orange -> deep red outer
+  vec3 cHot  = vec3(1.0, 0.95, 0.85);
+  vec3 cWarm = vec3(1.0, 0.62, 0.22);
+  vec3 cCool = vec3(0.85, 0.20, 0.06);
+  vec3 col = mix(cCool, cWarm, smoothstep(0.0,0.55,t));
+  col = mix(col, cHot, smoothstep(0.55,1.0,t));
+
+  // angle around disk for turbulent banding
+  float ang = atan(hitPos.z, hitPos.x);
+  float rot = uTime * uSpin * (1.6/ pow(r,1.2)); // inner spins faster (Keplerian)
+  float bands = vnoise(vec3(cos(ang+rot)*r, sin(ang+rot)*r, r*0.6)*0.9);
+  float fine  = vnoise(vec3(cos(ang+rot)*r, sin(ang+rot)*r, r)*3.5);
+  float tex = 0.55 + 0.65*bands + 0.25*fine;
+
+  // radial intensity falloff (brighter inside)
+  float intens = pow(t, 1.4) * 1.4 + 0.15;
+  // soft inner & outer edges
+  intens *= smoothstep(DISK_IN, DISK_IN+0.5, r);
+  intens *= smoothstep(DISK_OUT, DISK_OUT-1.6, r);
+
+  // --- relativistic Doppler beaming ---
+  // orbital velocity direction (counterclockwise in xz plane)
+  vec3 vdir = normalize(vec3(-hitPos.z, 0.0, hitPos.x));
+  float vmag = clamp(sqrt(0.5/ max(r,0.1)), 0.0, 0.72) * uSpin;
+  float beta = dot(vdir, -viewDir) * vmag;        // toward viewer => +
+  float doppler = 1.0/(1.0 - beta + 0.0001);
+  float beam = clamp(pow(doppler, 2.6), 0.25, 4.0);
+  // approaching side bluer, receding side redder
+  col = mix(col, col*vec3(0.8,0.92,1.25), clamp(beta*1.4,0.0,0.6));
+  col = mix(col, col*vec3(1.25,0.7,0.45), clamp(-beta*1.4,0.0,0.6));
+
+  return col * tex * intens * beam;
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*uRes) / uRes.y;
+
+  vec3 ro = uCamPos;
+  vec3 rd = normalize(uCamFwd*1.55 + uCamRight*uv.x + uCamUp*uv.y);
+
+  vec3 pos = ro;
+  vec3 vel = rd;
+
+  // conserved-ish angular momentum term for null geodesic
+  vec3 hvec = cross(pos, vel);
+  float h2 = dot(hvec, hvec);
+
+  vec3 color = vec3(0.0);
+  float prevY = pos.y;
+  bool captured = false;
+  float glow = 0.0;
+
+  const int STEPS = 280;
+  for(int i=0;i<STEPS;i++){
+    float r2 = dot(pos,pos);
+    float r  = sqrt(r2);
+
+    // captured by horizon
+    if(r < Rs*1.001){ captured = true; break; }
+
+    // adaptive step: small near BH, large far away
+    float dt = clamp(r*0.16, 0.02, 0.9);
+
+    // photon-ring glow accumulation (light skimming photon sphere)
+    float ps = abs(r - 1.5*Rs);
+    glow += exp(-ps*ps*5.0) * dt * 0.5;
+
+    vec3 newPos = pos + vel*dt;
+
+    // disk plane crossing (y=0) between pos and newPos
+    if(uShowDisk > 0.5 && (pos.y*newPos.y < 0.0)){
+      float f = pos.y/(pos.y-newPos.y);
+      vec3 hit = mix(pos, newPos, f);
+      float rd2 = length(hit.xz);
+      if(rd2 > DISK_IN-0.4 && rd2 < DISK_OUT+0.4){
+        vec3 vd = normalize(vel);
+        vec3 add = diskColor(rd2, hit, vd);
+        // gravitational redshift dimming near horizon
+        float gz = clamp(1.0 - Rs/max(rd2,Rs*1.05), 0.0, 1.0);
+        color += add * uBright * (0.5+0.5*gz);
+      }
+    }
+
+    // gravitational acceleration on the photon (Schwarzschild bending)
+    vec3 acc = -1.5 * h2 * pos / pow(r2, 2.5) * uMass;
+
+    pos = newPos;
+    vel += acc*dt;
+
+    prevY = pos.y;
+
+    // escaped to infinity
+    if(r > 42.0) break;
+  }
+
+  if(captured){
+    // pure horizon, but keep faint photon-ring glow that wrapped around
+    color += vec3(1.0,0.75,0.45) * glow * 0.30 * uBright;
+  } else {
+    color += background(normalize(vel));
+    color += vec3(1.0,0.78,0.5) * glow * 0.22 * uBright;
+  }
+
+  // tone map + gamma
+  color = vec3(1.0) - exp(-color*1.25);
+  color = pow(color, vec3(0.4545));
+  // subtle vignette
+  float vig = smoothstep(1.25, 0.35, length(uv));
+  color *= 0.55 + 0.45*vig;
+
+  gl_FragColor = vec4(color, 1.0);
+}
+`;
+
+function compile(type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s));
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSrc));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSrc));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const quad = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+const aPos = gl.getAttribLocation(prog, 'aPos');
+gl.enableVertexAttribArray(aPos);
+gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+const U = name => gl.getUniformLocation(prog, name);
+const u = {
+  res:U('uRes'), time:U('uTime'), camPos:U('uCamPos'), camFwd:U('uCamFwd'),
+  camRight:U('uCamRight'), camUp:U('uCamUp'), mass:U('uMass'), bright:U('uBright'),
+  spin:U('uSpin'), showDisk:U('uShowDisk'), showStars:U('uShowStars')
+};
+
+/* ---------- State ---------- */
+const state = {
+  mass:1.0, bright:1.2, spin:1.0, dist:14.0,
+  yaw:0.6, pitch:0.28,
+  showDisk:1, showStars:1, hires:false
+};
+const DEFAULT = {yaw:0.6, pitch:0.28, dist:14.0};
+
+function resize(){
+  const scale = state.hires ? Math.min(window.devicePixelRatio||1, 2) : Math.min(window.devicePixelRatio||1, 1.25)*0.78;
+  const w = Math.floor(window.innerWidth*scale);
+  const h = Math.floor(window.innerHeight*scale);
+  if(canvas.width!==w||canvas.height!==h){ canvas.width=w; canvas.height=h; }
+  gl.viewport(0,0,canvas.width,canvas.height);
+}
+window.addEventListener('resize', resize);
+
+/* ---------- Camera math ---------- */
+function camera(){
+  const p = state.pitch, y = state.yaw, d = state.dist;
+  const cp = Math.cos(p), sp = Math.sin(p);
+  const cy = Math.cos(y), sy = Math.sin(y);
+  const pos = [d*cp*sy, d*sp, d*cp*cy];
+  // forward = -pos normalized
+  let fwd = [-pos[0],-pos[1],-pos[2]];
+  const fl = Math.hypot(...fwd); fwd = fwd.map(v=>v/fl);
+  const wup = [0,1,0];
+  // right = normalize(cross(fwd, wup))
+  let right = [fwd[1]*wup[2]-fwd[2]*wup[1], fwd[2]*wup[0]-fwd[0]*wup[2], fwd[0]*wup[1]-fwd[1]*wup[0]];
+  const rl = Math.hypot(...right); right = right.map(v=>v/rl);
+  // up = cross(right, fwd)
+  const up = [right[1]*fwd[2]-right[2]*fwd[1], right[2]*fwd[0]-right[0]*fwd[2], right[0]*fwd[1]-right[1]*fwd[0]];
+  return {pos, fwd, right, up};
+}
+
+/* ---------- Render loop ---------- */
+const t0 = performance.now();
+function frame(){
+  resize();
+  const t = (performance.now()-t0)/1000;
+  const c = camera();
+  gl.uniform2f(u.res, canvas.width, canvas.height);
+  gl.uniform1f(u.time, t);
+  gl.uniform3fv(u.camPos, c.pos);
+  gl.uniform3fv(u.camFwd, c.fwd);
+  gl.uniform3fv(u.camRight, c.right);
+  gl.uniform3fv(u.camUp, c.up);
+  gl.uniform1f(u.mass, state.mass);
+  gl.uniform1f(u.bright, state.bright);
+  gl.uniform1f(u.spin, state.spin);
+  gl.uniform1f(u.showDisk, state.showDisk);
+  gl.uniform1f(u.showStars, state.showStars);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  requestAnimationFrame(frame);
+}
+frame();
+
+/* ---------- Interaction ---------- */
+let dragging=false, lastX=0, lastY=0;
+function down(x,y){ dragging=true; lastX=x; lastY=y; document.body.classList.add('dragging'); }
+function move(x,y){
+  if(!dragging) return;
+  state.yaw   -= (x-lastX)*0.006;
+  state.pitch += (y-lastY)*0.006;
+  state.pitch = Math.max(-1.45, Math.min(1.45, state.pitch));
+  lastX=x; lastY=y;
+}
+function up(){ dragging=false; document.body.classList.remove('dragging'); }
+
+canvas.addEventListener('mousedown', e=>down(e.clientX,e.clientY));
+window.addEventListener('mousemove', e=>move(e.clientX,e.clientY));
+window.addEventListener('mouseup', up);
+canvas.addEventListener('touchstart', e=>{const t=e.touches[0];down(t.clientX,t.clientY);},{passive:true});
+window.addEventListener('touchmove', e=>{const t=e.touches[0];move(t.clientX,t.clientY);},{passive:true});
+window.addEventListener('touchend', up);
+
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  state.dist = Math.max(6, Math.min(30, state.dist + e.deltaY*0.012));
+  document.getElementById('dist').value = state.dist;
+  setVal();
+},{passive:false});
+
+canvas.addEventListener('dblclick', ()=>{
+  state.yaw=DEFAULT.yaw; state.pitch=DEFAULT.pitch; state.dist=DEFAULT.dist;
+  document.getElementById('dist').value=state.dist; setVal();
+});
+
+/* ---------- UI ---------- */
+function bindSlider(id, key, fmt, p=true){
+  const el = document.getElementById(id);
+  const out = document.getElementById('v'+id.charAt(0).toUpperCase()+id.slice(1));
+  const upd = ()=>{
+    state[key] = parseFloat(el.value);
+    if(out) out.textContent = fmt(state[key]);
+    if(p){
+      const min=parseFloat(el.min), max=parseFloat(el.max);
+      el.style.setProperty('--p', ((state[key]-min)/(max-min)*100)+'%');
+    }
+  };
+  el.addEventListener('input', upd); upd();
+}
+function setVal(){
+  const el=document.getElementById('dist');
+  document.getElementById('vDist').textContent = parseFloat(el.value).toFixed(1);
+  el.style.setProperty('--p', ((state.dist-6)/(30-6)*100)+'%');
+}
+bindSlider('mass','mass',v=>v.toFixed(2)+'×');
+bindSlider('bright','bright',v=>v.toFixed(1));
+bindSlider('spin','spin',v=>v.toFixed(2)+'×');
+bindSlider('dist','dist',v=>v.toFixed(1));
+
+document.getElementById('tDisk').addEventListener('click', e=>{
+  state.showDisk = state.showDisk?0:1; e.target.classList.toggle('on', !!state.showDisk);
+});
+document.getElementById('tStars').addEventListener('click', e=>{
+  state.showStars = state.showStars?0:1; e.target.classList.toggle('on', !!state.showStars);
+});
+document.getElementById('tQual').addEventListener('click', e=>{
+  state.hires = !state.hires; e.target.classList.toggle('on', state.hires); resize();
+});
+
+const panel=document.getElementById('panel');
+document.getElementById('panelHead').addEventListener('click', ()=>panel.classList.toggle('collapsed'));
+</script>
+</body>
+</html>
