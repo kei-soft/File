@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>우리 은하 태양 공전 시뮬레이션</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #070816 0%, #02030a 70%, #000 100%);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #eef3ff;
+    }
+    #app { width: 100vw; height: 100vh; position: relative; }
+    canvas { display: block; }
+    .panel {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      width: min(380px, calc(100vw - 32px));
+      padding: 14px 16px;
+      border: 1px solid rgba(120, 160, 255, .25);
+      border-radius: 16px;
+      background: rgba(8, 12, 28, .72);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, .35);
+      user-select: none;
+    }
+    .panel h1 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+    .panel p {
+      margin: 4px 0;
+      color: #b9c7ee;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 88px 1fr 56px;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0 4px;
+      font-size: 13px;
+      color: #cdd8ff;
+    }
+    input[type="range"] { width: 100%; }
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    button {
+      border: 1px solid rgba(140, 170, 255, .3);
+      background: rgba(55, 82, 165, .35);
+      color: white;
+      padding: 8px 10px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 650;
+    }
+    button:hover { background: rgba(85, 115, 215, .48); }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: rgba(255, 208, 90, .14);
+      color: #ffe59b;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+    .legend {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, .13);
+      background: rgba(4, 6, 16, .62);
+      color: #cbd5ff;
+      font-size: 12px;
+      line-height: 1.7;
+      user-select: none;
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 7px;
+      vertical-align: middle;
+    }
+    .sun { background: #fff1a6; box-shadow: 0 0 12px #fff1a6; }
+    .disk { background: #9eb7ff; }
+    .bulge { background: #ffc16f; }
+    .trail { background: #6fa7ff; }
+    @media (max-width: 640px) {
+      .panel { font-size: 12px; }
+      .legend { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="panel">
+    <h1>우리 은하에서 태양의 공전 운동</h1>
+    <p>Python/Pygame/OpenGL 예제를 브라우저용 Three.js 시뮬레이션으로 변환한 버전입니다.</p>
+    <p><b>마우스 드래그</b>: 회전 · <b>휠</b>: 줌 · <b>W/A/S/D</b>: 시점 회전</p>
+    <p><b>Space</b>: 일시정지 · <b>[ / ]</b>: 느리게/빠르게 · <b>F</b>: 태양 따라가기 · <b>R</b>: 초기화</p>
+    <div class="row">
+      <span>속도</span>
+      <input id="speed" type="range" min="0" max="60" step="1" value="5" />
+      <b id="speedText">5 Myr/s</b>
+    </div>
+    <div class="buttons">
+      <button id="pauseBtn">일시정지</button>
+      <button id="followBtn">태양 따라가기 OFF</button>
+      <button id="resetBtn">시점 초기화</button>
+    </div>
+    <div class="badge" id="info">태양 공전주기 약 220 Myr · 현재 0.0 Myr</div>
+  </div>
+  <div class="legend">
+    <div><span class="dot sun"></span>태양</div>
+    <div><span class="dot disk"></span>은하 원반 / 나선팔</div>
+    <div><span class="dot bulge"></span>은하 중심 팽대부</div>
+    <div><span class="dot trail"></span>태양 이동 궤적</div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+
+const app = document.getElementById("app");
+const speedSlider = document.getElementById("speed");
+const speedText = document.getElementById("speedText");
+const pauseBtn = document.getElementById("pauseBtn");
+const followBtn = document.getElementById("followBtn");
+const resetBtn = document.getElementById("resetBtn");
+const info = document.getElementById("info");
+
+const KM_S_TO_KPC_MYR = 1.0227e-3;
+const SUN_R = 8.2;
+const VC = 230.0;
+const VC_KPC_MYR = VC * KM_S_TO_KPC_MYR;
+const TURNOVER_R = 1.5;
+const DISK_SCALE = 2.6;
+const DISK_MIN_R = 0.4;
+const DISK_MAX_R = 16.0;
+const DISK_THICKNESS = 0.22;
+const BULGE_R = 2.3;
+const BAR_OMEGA = 38.0 * KM_S_TO_KPC_MYR;
+const WARP_START_R = 10.0;
+const WARP_SLOPE = 0.16;
+const WARP_PRECESS_OMEGA = (VC_KPC_MYR / SUN_R) / 3.0;
+const CORR_AMP = 0.10;
+const CORR_K = 0.5;
+const CORR_OMEGA = 0.006;
+const ARMS = 4;
+const PITCH_DEG = 12.5;
+const ARM_FRACTION = 0.6;
+const ARM_SPREAD = 0.35;
+const DISK_STARS = 28000;
+const BULGE_STARS = 7000;
+const TRAIL_MAX = 400;
+
+function mulberry32(seed) {
+  return function() {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(42);
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = rand();
+  while (v === 0) v = rand();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+function angularSpeed(r) {
+  return VC_KPC_MYR * Math.tanh(r / TURNOVER_R) / r;
+}
+function sampleDiskRadius() {
+  while (true) {
+    const r = -Math.log(1 - rand()) * DISK_SCALE;
+    if (r >= DISK_MIN_R && r <= DISK_MAX_R) return r;
+  }
+}
+
+const disk = {
+  radius: new Float32Array(DISK_STARS),
+  phi0: new Float32Array(DISK_STARS),
+  omega: new Float32Array(DISK_STARS),
+  z0: new Float32Array(DISK_STARS),
+  warp: new Float32Array(DISK_STARS),
+  corr: new Float32Array(DISK_STARS),
+  pos: new Float32Array(DISK_STARS * 3),
+  color: new Float32Array(DISK_STARS * 3)
+};
+
+const pitch = PITCH_DEG * Math.PI / 180;
+for (let i = 0; i < DISK_STARS; i++) {
+  const r = sampleDiskRadius();
+  const armIndex = Math.floor(rand() * ARMS);
+  const onArm = rand() < ARM_FRACTION;
+  const spiralAngle = Math.log(r / DISK_MIN_R) / Math.tan(pitch);
+  const phiArm = armIndex * (2 * Math.PI / ARMS) + spiralAngle + randn() * ARM_SPREAD;
+  const phi = onArm ? phiArm : rand() * Math.PI * 2;
+
+  disk.radius[i] = r;
+  disk.phi0[i] = phi;
+  disk.omega[i] = angularSpeed(r);
+  disk.z0[i] = randn() * DISK_THICKNESS;
+  disk.warp[i] = WARP_SLOPE * Math.max(0, r - WARP_START_R);
+  disk.corr[i] = CORR_AMP * Math.min(Math.max(r / DISK_MAX_R, 0), 1);
+
+  let cr = 0.78 + 0.18 * rand();
+  let cg = 0.80 + 0.16 * rand();
+  let cb = 0.85 + 0.15 * rand();
+  if (onArm) { cb = 1.0; cr *= 0.85; }
+  if (rand() < 0.07) { cr = 1.0; cg = 0.6; cb = 0.4; }
+  disk.color[i * 3] = cr;
+  disk.color[i * 3 + 1] = cg;
+  disk.color[i * 3 + 2] = cb;
+}
+
+const bulge = {
+  x0: new Float32Array(BULGE_STARS),
+  y0: new Float32Array(BULGE_STARS),
+  z0: new Float32Array(BULGE_STARS),
+  pos: new Float32Array(BULGE_STARS * 3),
+  color: new Float32Array(BULGE_STARS * 3)
+};
+for (let i = 0; i < BULGE_STARS; i++) {
+  const radial = Math.min(-Math.log(1 - rand()) * BULGE_R * 0.45, BULGE_R * 1.6);
+  let x = randn(), y = randn(), z = randn();
+  const len = Math.sqrt(x*x + y*y + z*z) + 1e-9;
+  x = x / len * radial * 1.7;
+  y = y / len * radial * 0.9;
+  z = z / len * radial * 0.5;
+  bulge.x0[i] = x; bulge.y0[i] = y; bulge.z0[i] = z;
+  bulge.color[i * 3] = 1.0;
+  bulge.color[i * 3 + 1] = 0.72 + 0.18 * rand();
+  bulge.color[i * 3 + 2] = 0.35 + 0.2 * rand();
+}
+
+function sunPosition(t) {
+  const omega = angularSpeed(SUN_R);
+  const phi = omega * t;
+  const warpAmp = WARP_SLOPE * Math.max(0, SUN_R - WARP_START_R);
+  return new THREE.Vector3(
+    SUN_R * Math.cos(phi),
+    SUN_R * Math.sin(phi),
+    warpAmp * Math.sin(phi - WARP_PRECESS_OMEGA * t)
+      + CORR_AMP * (SUN_R / DISK_MAX_R) * Math.sin(CORR_K * SUN_R - CORR_OMEGA * t)
+  );
+}
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x02030a, 0.015);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.2, 600);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x02030a, 1);
+app.appendChild(renderer.domElement);
+
+const diskGeo = new THREE.BufferGeometry();
+diskGeo.setAttribute("position", new THREE.BufferAttribute(disk.pos, 3));
+diskGeo.setAttribute("color", new THREE.BufferAttribute(disk.color, 3));
+const diskMat = new THREE.PointsMaterial({
+  size: 0.055,
+  vertexColors: true,
+  transparent: true,
+  opacity: 0.72,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false
+});
+const diskPoints = new THREE.Points(diskGeo, diskMat);
+scene.add(diskPoints);
+
+const bulgeGeo = new THREE.BufferGeometry();
+bulgeGeo.setAttribute("position", new THREE.BufferAttribute(bulge.pos, 3));
+bulgeGeo.setAttribute("color", new THREE.BufferAttribute(bulge.color, 3));
+const bulgeMat = new THREE.PointsMaterial({
+  size: 0.085,
+  vertexColors: true,
+  transparent: true,
+  opacity: 0.78,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false
+});
+const bulgePoints = new THREE.Points(bulgeGeo, bulgeMat);
+scene.add(bulgePoints);
+
+const sunGeo = new THREE.SphereGeometry(0.18, 24, 16);
+const sunMat = new THREE.MeshBasicMaterial({ color: 0xfff2a2 });
+const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+scene.add(sunMesh);
+const sunGlow = new THREE.PointLight(0xffe9a0, 1.4, 10);
+sunMesh.add(sunGlow);
+
+const trailPositions = new Float32Array(TRAIL_MAX * 3);
+const trailGeo = new THREE.BufferGeometry();
+trailGeo.setAttribute("position", new THREE.BufferAttribute(trailPositions, 3));
+trailGeo.setDrawRange(0, 0);
+const trailMat = new THREE.LineBasicMaterial({
+  color: 0x74a8ff,
+  transparent: true,
+  opacity: 0.65,
+  blending: THREE.AdditiveBlending
+});
+const trailLine = new THREE.Line(trailGeo, trailMat);
+scene.add(trailLine);
+
+const grid = new THREE.GridHelper(36, 36, 0x22335f, 0x111a33);
+grid.rotation.x = Math.PI / 2;
+grid.material.transparent = true;
+grid.material.opacity = 0.12;
+scene.add(grid);
+
+let yaw = 0.6;
+let pitchCam = 0.7;
+let distance = 45.0;
+let target = new THREE.Vector3();
+let followSun = false;
+let paused = false;
+let simulationTime = 0;
+let simulationSpeed = 5;
+let trail = [];
+let trailAccumulator = 0;
+let dragging = false;
+let lastX = 0, lastY = 0;
+const keys = new Set();
+
+function resetView() {
+  yaw = 0.6;
+  pitchCam = 0.7;
+  distance = 45.0;
+  followSun = false;
+  followBtn.textContent = "태양 따라가기 OFF";
+}
+
+function updateCamera(dt, sun) {
+  const rot = 1.4 * dt;
+  if (keys.has("ArrowLeft") || keys.has("KeyA")) yaw += rot;
+  if (keys.has("ArrowRight") || keys.has("KeyD")) yaw -= rot;
+  if (keys.has("ArrowUp") || keys.has("KeyW")) pitchCam = Math.min(1.45, pitchCam + rot);
+  if (keys.has("ArrowDown") || keys.has("KeyS")) pitchCam = Math.max(-1.45, pitchCam - rot);
+  if (keys.has("KeyQ") || keys.has("Equal") || keys.has("NumpadAdd")) distance = Math.max(2, distance * (1 - 1.2 * dt));
+  if (keys.has("KeyE") || keys.has("Minus") || keys.has("NumpadSubtract")) distance = Math.min(220, distance * (1 + 1.2 * dt));
+
+  target.copy(followSun ? sun : new THREE.Vector3(0, 0, 0));
+  const cp = Math.cos(pitchCam);
+  camera.position.set(
+    target.x + distance * cp * Math.sin(yaw),
+    target.y + distance * cp * Math.cos(yaw),
+    target.z + distance * Math.sin(pitchCam)
+  );
+  camera.lookAt(target);
+}
+
+function updateGalaxy(t) {
+  for (let i = 0; i < DISK_STARS; i++) {
+    const r = disk.radius[i];
+    const phi = disk.phi0[i] + disk.omega[i] * t;
+    const p = i * 3;
+    disk.pos[p] = r * Math.cos(phi);
+    disk.pos[p + 1] = r * Math.sin(phi);
+    disk.pos[p + 2] = disk.z0[i]
+      + disk.warp[i] * Math.sin(phi - WARP_PRECESS_OMEGA * t)
+      + disk.corr[i] * Math.sin(CORR_K * r - CORR_OMEGA * t);
+  }
+  diskGeo.attributes.position.needsUpdate = true;
+
+  const bar = BAR_OMEGA * t;
+  const c = Math.cos(bar), s = Math.sin(bar);
+  for (let i = 0; i < BULGE_STARS; i++) {
+    const p = i * 3;
+    bulge.pos[p] = bulge.x0[i] * c - bulge.y0[i] * s;
+    bulge.pos[p + 1] = bulge.x0[i] * s + bulge.y0[i] * c;
+    bulge.pos[p + 2] = bulge.z0[i];
+  }
+  bulgeGeo.attributes.position.needsUpdate = true;
+}
+
+function updateTrail(sun) {
+  trail.push(sun.clone());
+  if (trail.length > TRAIL_MAX) trail.shift();
+  for (let i = 0; i < trail.length; i++) {
+    trailPositions[i * 3] = trail[i].x;
+    trailPositions[i * 3 + 1] = trail[i].y;
+    trailPositions[i * 3 + 2] = trail[i].z;
+  }
+  trailGeo.setDrawRange(0, trail.length);
+  trailGeo.attributes.position.needsUpdate = true;
+}
+
+renderer.domElement.addEventListener("pointerdown", e => {
+  dragging = true;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  renderer.domElement.setPointerCapture(e.pointerId);
+});
+renderer.domElement.addEventListener("pointermove", e => {
+  if (!dragging) return;
+  const dx = e.clientX - lastX;
+  const dy = e.clientY - lastY;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  yaw -= dx * 0.006;
+  pitchCam = Math.max(-1.45, Math.min(1.45, pitchCam + dy * 0.006));
+});
+renderer.domElement.addEventListener("pointerup", () => dragging = false);
+renderer.domElement.addEventListener("wheel", e => {
+  e.preventDefault();
+  distance = Math.max(2, Math.min(220, distance * (e.deltaY < 0 ? 0.9 : 1.1)));
+}, { passive: false });
+
+addEventListener("keydown", e => {
+  keys.add(e.code);
+  if (e.code === "Space") {
+    paused = !paused;
+    pauseBtn.textContent = paused ? "재생" : "일시정지";
+    e.preventDefault();
+  } else if (e.code === "KeyF") {
+    followSun = !followSun;
+    followBtn.textContent = followSun ? "태양 따라가기 ON" : "태양 따라가기 OFF";
+  } else if (e.code === "KeyR") {
+    resetView();
+  } else if (e.code === "BracketLeft") {
+    simulationSpeed = Math.max(0, simulationSpeed - 2);
+    speedSlider.value = simulationSpeed;
+    speedText.textContent = `${simulationSpeed} Myr/s`;
+  } else if (e.code === "BracketRight") {
+    simulationSpeed = Math.min(60, simulationSpeed + 2);
+    speedSlider.value = simulationSpeed;
+    speedText.textContent = `${simulationSpeed} Myr/s`;
+  }
+});
+addEventListener("keyup", e => keys.delete(e.code));
+
+speedSlider.addEventListener("input", () => {
+  simulationSpeed = Number(speedSlider.value);
+  speedText.textContent = `${simulationSpeed} Myr/s`;
+});
+pauseBtn.addEventListener("click", () => {
+  paused = !paused;
+  pauseBtn.textContent = paused ? "재생" : "일시정지";
+});
+followBtn.addEventListener("click", () => {
+  followSun = !followSun;
+  followBtn.textContent = followSun ? "태양 따라가기 ON" : "태양 따라가기 OFF";
+});
+resetBtn.addEventListener("click", resetView);
+
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+let last = performance.now();
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+
+  if (!paused) {
+    simulationTime += simulationSpeed * dt;
+    trailAccumulator += simulationSpeed * dt;
+    if (trailAccumulator >= 2.0) {
+      updateTrail(sunPosition(simulationTime));
+      trailAccumulator = 0;
+    }
+  }
+
+  updateGalaxy(simulationTime);
+  const sun = sunPosition(simulationTime);
+  sunMesh.position.copy(sun);
+  updateCamera(dt, sun);
+
+  info.textContent = `태양 공전주기 약 220 Myr · 현재 ${simulationTime.toFixed(1)} Myr`;
+  renderer.render(scene, camera);
+}
+animate(performance.now());
+</script>
+</body>
+</html>

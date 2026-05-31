@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>우리 은하 · 태양 공전 시뮬레이션</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#05060d;
+    --ink:#e7ecf5;
+    --dim:#7c879c;
+    --amber:#e8b34a;     /* 태양 계열 */
+    --cyan:#6fd6e8;      /* 데이터 계열 */
+    --line:rgba(120,140,180,.16);
+    --panel:rgba(10,13,24,.62);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:"IBM Plex Mono",monospace;}
+  #app{position:fixed;inset:0;}
+  canvas{display:block;}
+
+  /* ── 상단 타이틀 ─────────────────────────── */
+  .title{
+    position:absolute;top:22px;left:26px;z-index:10;pointer-events:none;
+    text-shadow:0 2px 18px rgba(0,0,0,.8);
+  }
+  .title h1{
+    font-family:"Fraunces",serif;font-weight:600;font-size:26px;letter-spacing:.3px;
+    line-height:1.05;color:var(--ink);
+  }
+  .title .sub{
+    margin-top:5px;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;
+    color:var(--dim);
+  }
+  .title .sub b{color:var(--amber);font-weight:500;}
+
+  /* ── 텔레메트리 패널 ─────────────────────── */
+  .telemetry{
+    position:absolute;top:22px;right:26px;z-index:10;
+    background:var(--panel);backdrop-filter:blur(9px);
+    border:1px solid var(--line);border-radius:13px;
+    padding:15px 18px;min-width:208px;
+    box-shadow:0 18px 50px rgba(0,0,0,.5);
+  }
+  .telemetry .row{display:flex;justify-content:space-between;align-items:baseline;
+    padding:5px 0;font-size:12px;}
+  .telemetry .row + .row{border-top:1px solid var(--line);}
+  .telemetry .k{color:var(--dim);letter-spacing:.4px;}
+  .telemetry .v{color:var(--cyan);font-weight:600;font-variant-numeric:tabular-nums;}
+  .telemetry .v.sun{color:var(--amber);}
+  .telemetry .v.pause{color:#ff8b6b;}
+
+  /* ── 컨트롤 도움말 ───────────────────────── */
+  .help{
+    position:absolute;left:26px;bottom:22px;z-index:10;
+    background:var(--panel);backdrop-filter:blur(9px);
+    border:1px solid var(--line);border-radius:13px;
+    padding:13px 16px;font-size:11.5px;line-height:1.95;color:var(--dim);
+    box-shadow:0 18px 50px rgba(0,0,0,.5);
+  }
+  .help b{color:var(--ink);font-weight:500;}
+  .help .kbd{
+    display:inline-block;min-width:17px;text-align:center;
+    padding:1px 6px;margin:0 1px;border-radius:5px;
+    background:rgba(255,255,255,.06);border:1px solid var(--line);
+    color:var(--ink);font-size:10.5px;
+  }
+  .help .grp{margin-top:3px;}
+  .help .grp:first-child{margin-top:0;}
+
+  /* ── 우하단 버튼 ─────────────────────────── */
+  .actions{position:absolute;right:26px;bottom:22px;z-index:10;display:flex;gap:8px;}
+  .actions button{
+    font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.4px;
+    color:var(--ink);background:var(--panel);backdrop-filter:blur(9px);
+    border:1px solid var(--line);border-radius:10px;padding:9px 13px;cursor:pointer;
+    transition:border-color .18s ease, color .18s ease, transform .08s ease;
+  }
+  .actions button:hover{border-color:var(--cyan);color:var(--cyan);}
+  .actions button:active{transform:translateY(1px);}
+  .actions button.on{border-color:var(--amber);color:var(--amber);}
+
+  .scan{position:absolute;inset:0;z-index:5;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 42%,transparent 60%,rgba(0,0,0,.45) 100%);}
+
+  @media (max-width:680px){
+    .title h1{font-size:20px;} .telemetry{min-width:168px;padding:12px 13px;}
+    .help{display:none;} .title{left:18px;top:16px;} .telemetry{right:14px;top:16px;}
+    .actions{right:14px;bottom:16px;} .actions button{padding:8px 10px;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div class="title">
+  <h1>우리 은하 · 태양의 공전</h1>
+  <div class="sub">MILKY WAY ROTATION &nbsp;·&nbsp; <b>R₀ 8.2 kpc</b> &nbsp;·&nbsp; <b>Vc 230 km/s</b></div>
+</div>
+
+<div class="telemetry">
+  <div class="row"><span class="k">경과 시간</span><span class="v" id="t-time">0 Myr</span></div>
+  <div class="row"><span class="k">공전 횟수</span><span class="v sun" id="t-orbit">0.00 회</span></div>
+  <div class="row"><span class="k">진행 속도</span><span class="v" id="t-speed">5.0 Myr/s</span></div>
+  <div class="row"><span class="k">태양 주기</span><span class="v sun" id="t-period">— Myr</span></div>
+  <div class="row"><span class="k">상태</span><span class="v" id="t-state">재생 중</span></div>
+</div>
+
+<div class="help">
+  <div class="grp"><b>마우스</b> 드래그=회전 · 휠=확대/축소</div>
+  <div class="grp"><b>회전</b> <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> / 방향키 &nbsp; <b>줌</b> <span class="kbd">Q</span><span class="kbd">E</span> 또는 <span class="kbd">+</span><span class="kbd">−</span></div>
+  <div class="grp"><b>속도</b> <span class="kbd">[</span><span class="kbd">]</span> &nbsp; <b>일시정지</b> <span class="kbd">Space</span></div>
+  <div class="grp"><b>F</b> 태양 추적 &nbsp; <b>R</b> 시점 초기화</div>
+</div>
+
+<div class="actions">
+  <button id="btn-pause">⏸ 일시정지</button>
+  <button id="btn-follow">◎ 태양 추적</button>
+  <button id="btn-reset">↺ 초기화</button>
+</div>
+
+<div class="scan"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =========================================================================
+   관측 기반 상수  (공간 kpc, 시간 Myr, 속도 km/s)  — 원본 galaxy.py 이식
+   ========================================================================= */
+const KMS_TO_KPC_MYR        = 1.0227e-3;
+const SUN_R                 = 8.2;
+const VC                    = 230.0;
+const VC_KPC_MYR            = VC * KMS_TO_KPC_MYR;
+const ROT_TURNOVER          = 1.5;
+const DISK_SCALE            = 2.6;
+const DISK_MIN_R            = 0.4;
+const DISK_MAX_R            = 16.0;
+const DISK_THICKNESS        = 0.22;
+const BULGE_R               = 2.3;
+const BAR_OMEGA             = 38.0 * KMS_TO_KPC_MYR;
+const WARP_START            = 10.0;
+const WARP_SLOPE            = 0.16;
+const WARP_PRECESSION_OMEGA = (VC_KPC_MYR / SUN_R) / 3.0;
+const CORR_AMP              = 0.10;
+const CORR_WAVENUMBER       = 0.5;
+const CORR_OMEGA            = 0.006;
+const ARMS                  = 4;
+const ARM_PITCH_DEG         = 12.5;
+const ARM_FRACTION          = 0.6;
+const ARM_SPREAD            = 0.35;
+const DISK_STARS            = 28000;
+const BULGE_STARS           = 7000;
+
+const angularSpeed = (r) => VC_KPC_MYR * Math.tanh(r / ROT_TURNOVER) / r;
+
+/* ── 시드 난수 (mulberry32) + 정규/지수 분포 ── */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const rng = mulberry32(42);
+function gauss(){let u=0,v=0;while(u===0)u=rng();while(v===0)v=rng();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function expo(scale){return -scale*Math.log(1-rng());}
+
+/* ── 원반 반경 표본 (지수분포, [MIN,MAX] 거부 표집) ── */
+function sampleDiskRadii(n){
+  const out=new Float64Array(n);let i=0;
+  while(i<n){const c=expo(DISK_SCALE);if(c>=DISK_MIN_R&&c<=DISK_MAX_R)out[i++]=c;}
+  return out;
+}
+
+/* =========================================================================
+   은하 구조 생성
+   ========================================================================= */
+const pitch = ARM_PITCH_DEG*Math.PI/180;
+
+// ── 원반 (disk) ──
+const dR=sampleDiskRadii(DISK_STARS);
+const dPhi0=new Float64Array(DISK_STARS);
+const dOmega=new Float64Array(DISK_STARS);
+const dZ0=new Float64Array(DISK_STARS);
+const dWarp=new Float64Array(DISK_STARS);
+const dCorr=new Float64Array(DISK_STARS);
+const diskPos=new Float32Array(DISK_STARS*3);
+const diskCol=new Float32Array(DISK_STARS*3);
+
+for(let i=0;i<DISK_STARS;i++){
+  const r=dR[i];
+  const onArm=rng()<ARM_FRACTION;
+  const armIdx=Math.floor(rng()*ARMS);
+  const spiral=Math.log(r/DISK_MIN_R)/Math.tan(pitch);
+  const phiArm=armIdx*(2*Math.PI/ARMS)+spiral+gauss()*ARM_SPREAD;
+  const phiUni=rng()*2*Math.PI;
+  dPhi0[i]=onArm?phiArm:phiUni;
+  dOmega[i]=angularSpeed(r);
+  dZ0[i]=gauss()*DISK_THICKNESS;
+  dWarp[i]=WARP_SLOPE*Math.max(0,r-WARP_START);
+  dCorr[i]=CORR_AMP*Math.min(1,Math.max(0,r/DISK_MAX_R));
+
+  // 색상 (원본 규칙) → 가산 블렌딩용으로 alpha를 밝기에 반영
+  let cr=0.78+0.18*rng(), cg=0.80+0.16*rng(), cb=0.85+0.15*rng();
+  if(onArm){cb=1.0;cr*=0.85;}
+  if(rng()<0.07){cr=1.0;cg=0.6;cb=0.4;}      // 붉은 별 7%
+  const a=onArm?0.75:0.55;
+  diskCol[i*3]=cr*a; diskCol[i*3+1]=cg*a; diskCol[i*3+2]=cb*a;
+}
+
+// ── 팽대부 (bulge) : 막대 형태 + 패턴 회전 ──
+const bX0=new Float64Array(BULGE_STARS);
+const bY0=new Float64Array(BULGE_STARS);
+const bZ0=new Float64Array(BULGE_STARS);
+const bulgePos=new Float32Array(BULGE_STARS*3);
+const bulgeCol=new Float32Array(BULGE_STARS*3);
+
+for(let i=0;i<BULGE_STARS;i++){
+  const rd=Math.min(expo(BULGE_R*0.45),BULGE_R*1.6);
+  let vx=gauss(),vy=gauss(),vz=gauss();
+  const inv=1/(Math.sqrt(vx*vx+vy*vy+vz*vz)+1e-9);
+  bX0[i]=vx*inv*rd*1.7;   // 막대 장축
+  bY0[i]=vy*inv*rd*0.9;
+  bZ0[i]=vz*inv*rd*0.5;
+  const a=0.6;
+  bulgeCol[i*3]=1.0*a;
+  bulgeCol[i*3+1]=(0.72+0.18*rng())*a;
+  bulgeCol[i*3+2]=(0.35+0.2*rng())*a;
+}
+
+// ── 태양 ──
+const SUN_OMEGA=angularSpeed(SUN_R);
+const SUN_PERIOD=2*Math.PI/SUN_OMEGA;
+function sunPosition(t){
+  const phi=SUN_OMEGA*t;
+  const x=SUN_R*Math.cos(phi), y=SUN_R*Math.sin(phi);
+  const warp=WARP_SLOPE*Math.max(0,SUN_R-WARP_START);
+  const z=warp*Math.sin(phi-WARP_PRECESSION_OMEGA*t)
+         +CORR_AMP*(SUN_R/DISK_MAX_R)*Math.sin(CORR_WAVENUMBER*SUN_R-CORR_OMEGA*t);
+  return [x,y,z];
+}
+
+/* =========================================================================
+   Three.js 장면
+   ========================================================================= */
+const app=document.getElementById('app');
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x05060d,0.0);
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.2,2000);
+camera.up.set(0,0,1);   // 은하 평면을 xy, 회전축을 z 로 (원본 좌표계)
+
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.setClearColor(0x05060d,1);
+app.appendChild(renderer.domElement);
+
+// 부드러운 발광 점 텍스처
+function glowTexture(){
+  const s=64,c=document.createElement('canvas');c.width=c.height=s;
+  const g=c.getContext('2d').createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+  g.addColorStop(0,'rgba(255,255,255,1)');
+  g.addColorStop(.35,'rgba(255,255,255,.55)');
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  const ctx=c.getContext('2d');ctx.fillStyle=g;ctx.fillRect(0,0,s,s);
+  const tex=new THREE.CanvasTexture(c);tex.needsUpdate=true;return tex;
+}
+const spriteTex=glowTexture();
+
+function makePoints(posArr,colArr,size){
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(posArr,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(colArr,3));
+  const mat=new THREE.PointsMaterial({
+    size,map:spriteTex,vertexColors:true,transparent:true,
+    blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false,
+    sizeAttenuation:false
+  });
+  return new THREE.Points(geo,mat);
+}
+
+const diskPoints=makePoints(diskPos,diskCol,2.4);
+const bulgePoints=makePoints(bulgePos,bulgeCol,3.4);
+scene.add(diskPoints,bulgePoints);
+
+// 배경 별 (정적 헤일로)
+(function backdrop(){
+  const N=1400,p=new Float32Array(N*3),c=new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    const r=120+rng()*380, th=rng()*2*Math.PI, ph=Math.acos(2*rng()-1);
+    p[i*3]=r*Math.sin(ph)*Math.cos(th);
+    p[i*3+1]=r*Math.sin(ph)*Math.sin(th);
+    p[i*3+2]=r*Math.cos(ph);
+    const b=0.25+0.4*rng();c[i*3]=c[i*3+1]=c[i*3+2]=b;
+  }
+  scene.add(makePoints(p,c,1.4));
+})();
+
+// 태양
+const sunGeo=new THREE.BufferGeometry();
+sunGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(3),3));
+const sunPoint=new THREE.Points(sunGeo,new THREE.PointsMaterial({
+  size:16,map:spriteTex,color:0xfff0bf,transparent:true,
+  blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false,sizeAttenuation:false
+}));
+scene.add(sunPoint);
+
+// 태양 궤도 잔상
+const TRAIL_MAX=400;
+const trailPos=new Float32Array(TRAIL_MAX*3);
+const trailCol=new Float32Array(TRAIL_MAX*3);
+const trailGeo=new THREE.BufferGeometry();
+trailGeo.setAttribute('position',new THREE.BufferAttribute(trailPos,3));
+trailGeo.setAttribute('color',new THREE.BufferAttribute(trailCol,3));
+const trailLine=new THREE.Line(trailGeo,new THREE.LineBasicMaterial({
+  vertexColors:true,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false
+}));
+scene.add(trailLine);
+let trail=[];          // [x,y,z] 목록
+let trailAccum=0;
+
+/* =========================================================================
+   카메라 컨트롤 (원본 camera.py 와 동일한 yaw/pitch/distance 모델)
+   ========================================================================= */
+const PITCH_LIMIT=1.45;
+const cam={yaw:0.6,pitch:0.7,distance:45,target:new THREE.Vector3(0,0,0),follow:false};
+function camReset(){cam.yaw=0.6;cam.pitch=0.7;cam.distance=45;cam.follow=false;syncFollowBtn();}
+function camZoom(f){cam.distance=Math.max(2,Math.min(220,cam.distance*f));}
+function camApply(){
+  const cp=Math.cos(cam.pitch);
+  camera.position.set(
+    cam.target.x+cam.distance*cp*Math.sin(cam.yaw),
+    cam.target.y+cam.distance*cp*Math.cos(cam.yaw),
+    cam.target.z+cam.distance*Math.sin(cam.pitch));
+  camera.lookAt(cam.target);
+}
+
+// 마우스
+let dragging=false,lastX=0,lastY=0;
+const cv=renderer.domElement;
+cv.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;cv.setPointerCapture(e.pointerId);});
+cv.addEventListener('pointerup',e=>{dragging=false;});
+cv.addEventListener('pointermove',e=>{
+  if(!dragging)return;
+  const dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;
+  cam.yaw-=dx*0.006;
+  cam.pitch=Math.max(-PITCH_LIMIT,Math.min(PITCH_LIMIT,cam.pitch+dy*0.006));
+});
+cv.addEventListener('wheel',e=>{e.preventDefault();camZoom(e.deltaY<0?0.9:1.1);},{passive:false});
+
+// 키보드
+const keys={};
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k))e.preventDefault();
+  if(k===' '){togglePause();return;}
+  if(k==='r'){camReset();return;}
+  if(k==='f'){toggleFollow();return;}
+  if(k==='['){speed=Math.max(0,speed-2);return;}
+  if(k===']'){speed=Math.min(60,speed+2);return;}
+  keys[k]=true;
+});
+addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+
+function camKeyUpdate(dt){
+  const rs=1.4*dt;
+  if(keys['arrowleft']||keys['a'])cam.yaw+=rs;
+  if(keys['arrowright']||keys['d'])cam.yaw-=rs;
+  if(keys['arrowup']||keys['w'])cam.pitch=Math.min(PITCH_LIMIT,cam.pitch+rs);
+  if(keys['arrowdown']||keys['s'])cam.pitch=Math.max(-PITCH_LIMIT,cam.pitch-rs);
+  if(keys['q']||keys['=']||keys['+'])camZoom(1-1.2*dt);
+  if(keys['e']||keys['-']||keys['_'])camZoom(1+1.2*dt);
+}
+
+/* =========================================================================
+   시뮬레이션 루프
+   ========================================================================= */
+let simTime=0, speed=5.0, paused=false, last=performance.now();
+
+function updateDisk(t){
+  for(let i=0;i<DISK_STARS;i++){
+    const r=dR[i], phi=dPhi0[i]+dOmega[i]*t;
+    diskPos[i*3]=r*Math.cos(phi);
+    diskPos[i*3+1]=r*Math.sin(phi);
+    diskPos[i*3+2]=dZ0[i]
+      +dWarp[i]*Math.sin(phi-WARP_PRECESSION_OMEGA*t)
+      +dCorr[i]*Math.sin(CORR_WAVENUMBER*r-CORR_OMEGA*t);
+  }
+  diskPoints.geometry.attributes.position.needsUpdate=true;
+}
+function updateBulge(t){
+  const a=BAR_OMEGA*t, ca=Math.cos(a), sa=Math.sin(a);
+  for(let i=0;i<BULGE_STARS;i++){
+    bulgePos[i*3]=bX0[i]*ca-bY0[i]*sa;
+    bulgePos[i*3+1]=bX0[i]*sa+bY0[i]*ca;
+    bulgePos[i*3+2]=bZ0[i];
+  }
+  bulgePoints.geometry.attributes.position.needsUpdate=true;
+}
+function updateTrail(){
+  const n=trail.length;
+  for(let i=0;i<n;i++){
+    trailPos[i*3]=trail[i][0];trailPos[i*3+1]=trail[i][1];trailPos[i*3+2]=trail[i][2];
+    const f=0.05+0.5*(i/n);   // 오래된 꼬리는 어둡게
+    trailCol[i*3]=0.4*f;trailCol[i*3+1]=0.7*f;trailCol[i*3+2]=1.0*f;
+  }
+  trailGeo.setDrawRange(0,n);
+  trailGeo.attributes.position.needsUpdate=true;
+  trailGeo.attributes.color.needsUpdate=true;
+}
+
+const $=(id)=>document.getElementById(id);
+function updateHUD(){
+  $('t-time').textContent=Math.round(simTime).toLocaleString()+' Myr';
+  $('t-orbit').textContent=(simTime/SUN_PERIOD).toFixed(2)+' 회';
+  $('t-speed').textContent=speed.toFixed(1)+' Myr/s';
+  $('t-period').textContent=Math.round(SUN_PERIOD)+' Myr';
+  const st=$('t-state');
+  st.textContent=paused?'일시정지':(cam.follow?'태양 추적':'재생 중');
+  st.className='v'+(paused?' pause':(cam.follow?' sun':''));
+}
+
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000);last=now;
+  if(!paused){
+    simTime+=speed*dt;
+    trailAccum+=speed*dt;
+    if(trailAccum>=2.0){
+      trail.push(sunPosition(simTime));
+      if(trail.length>TRAIL_MAX)trail.shift();
+      trailAccum=0;
+    }
+  }
+  camKeyUpdate(dt);
+  const sp=sunPosition(simTime);
+  cam.target.set(...(cam.follow?sp:[0,0,0]));
+  camApply();
+
+  updateDisk(simTime);
+  updateBulge(simTime);
+  sunGeo.attributes.position.array.set(sp);
+  sunGeo.attributes.position.needsUpdate=true;
+  updateTrail();
+  updateHUD();
+
+  renderer.render(scene,camera);
+  requestAnimationFrame(frame);
+}
+
+/* ── UI 버튼 ── */
+function togglePause(){paused=!paused;$('btn-pause').textContent=paused?'▶ 재생':'⏸ 일시정지';$('btn-pause').classList.toggle('on',paused);}
+function toggleFollow(){cam.follow=!cam.follow;syncFollowBtn();}
+function syncFollowBtn(){$('btn-follow').classList.toggle('on',cam.follow);}
+$('btn-pause').onclick=togglePause;
+$('btn-follow').onclick=toggleFollow;
+$('btn-reset').onclick=()=>{camReset();};
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

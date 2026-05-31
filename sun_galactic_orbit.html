@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>은하 속 태양의 공전</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&family=Space+Mono:wght@400;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#04050c;
+    --panel:rgba(13,17,32,0.66);
+    --panel-line:rgba(140,160,220,0.14);
+    --ink:#e9ecf6;
+    --muted:#8b93b0;
+    --amber:#f4c66b;
+    --amber-soft:#ffe2a0;
+    --cyan:#8fb8ff;
+    --sun:#ffe27a;
+    --grid:rgba(120,150,230,0.07);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:var(--bg);color:var(--ink);}
+  body{
+    font-family:"Gowun Dodum","Space Mono",sans-serif;
+    min-height:100vh;
+    background:
+      radial-gradient(1200px 800px at 70% -10%, rgba(60,40,90,0.25), transparent 60%),
+      radial-gradient(900px 700px at 10% 110%, rgba(30,60,110,0.22), transparent 55%),
+      var(--bg);
+    padding:28px clamp(16px,4vw,56px) 64px;
+    overflow-x:hidden;
+  }
+  /* faint star grain over the whole page */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,.5), transparent),
+      radial-gradient(1px 1px at 80% 20%, rgba(255,255,255,.35), transparent),
+      radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,.4), transparent),
+      radial-gradient(1px 1px at 35% 85%, rgba(255,255,255,.3), transparent),
+      radial-gradient(1px 1px at 90% 60%, rgba(255,255,255,.35), transparent);
+    background-size:cover;opacity:.5;
+  }
+  .wrap{position:relative;z-index:1;max-width:1240px;margin:0 auto;}
+
+  header{margin-bottom:26px;}
+  .kicker{
+    font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.42em;
+    text-transform:uppercase;color:var(--amber);opacity:.9;margin-bottom:8px;
+  }
+  h1{
+    font-family:"Gowun Batang",serif;font-weight:700;line-height:1.04;
+    font-size:clamp(34px,6vw,64px);letter-spacing:-.01em;
+  }
+  h1 .em{font-family:"Instrument Serif",serif;font-style:italic;font-weight:400;color:var(--amber-soft);}
+  .lede{color:var(--muted);max-width:60ch;margin-top:12px;font-size:15px;line-height:1.7;}
+
+  .stage{
+    display:grid;grid-template-columns:1.55fr .95fr;gap:18px;margin-top:26px;align-items:start;
+  }
+  @media (max-width:880px){.stage{grid-template-columns:1fr;}}
+
+  .canvas-card{
+    position:relative;border:1px solid var(--panel-line);border-radius:18px;overflow:hidden;
+    background:#02030a;
+    box-shadow:0 30px 80px -40px rgba(0,0,0,.9), inset 0 0 120px rgba(40,30,70,.25);
+  }
+  #galaxy{display:block;width:100%;aspect-ratio:1/1;}
+  .stamp{
+    position:absolute;left:16px;top:14px;font-family:"Space Mono",monospace;
+    font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;color:rgba(220,225,245,.55);
+    pointer-events:none;
+  }
+  .stamp .dot{color:var(--amber);}
+
+  .side{display:flex;flex-direction:column;gap:18px;}
+
+  .panel{
+    border:1px solid var(--panel-line);border-radius:18px;padding:20px 20px 22px;
+    background:var(--panel);backdrop-filter:blur(10px);
+  }
+  .panel h2{
+    font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.3em;text-transform:uppercase;
+    color:var(--cyan);margin-bottom:16px;font-weight:700;
+  }
+
+  .readout{display:grid;grid-template-columns:1fr;gap:14px;}
+  .stat{border-bottom:1px dashed rgba(140,160,220,.16);padding-bottom:13px;}
+  .stat:last-child{border-bottom:none;padding-bottom:0;}
+  .stat .lab{font-size:12px;color:var(--muted);margin-bottom:5px;}
+  .stat .val{font-family:"Space Mono",monospace;font-size:clamp(20px,3.4vw,26px);color:var(--amber-soft);font-weight:700;letter-spacing:-.01em;}
+  .stat .val small{font-size:13px;color:var(--muted);font-weight:400;margin-left:4px;}
+
+  .bar{height:6px;border-radius:6px;background:rgba(255,255,255,.08);margin-top:9px;overflow:hidden;}
+  .bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--amber),var(--sun));border-radius:6px;}
+
+  .controls{display:flex;flex-direction:column;gap:16px;}
+  .row{display:flex;align-items:center;gap:12px;}
+  button{
+    font-family:"Gowun Dodum",sans-serif;cursor:pointer;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.04);color:var(--ink);border-radius:11px;padding:11px 16px;
+    font-size:14px;transition:.18s;flex:1;
+  }
+  button:hover{background:rgba(244,198,107,.14);border-color:rgba(244,198,107,.4);}
+  button.primary{background:var(--amber);color:#1a1304;border-color:var(--amber);font-weight:700;}
+  button.primary:hover{background:var(--sun);}
+
+  .speed label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px;}
+  .speed .now{font-family:"Space Mono",monospace;color:var(--amber);}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:5px;
+    background:rgba(255,255,255,.12);outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+    background:var(--amber);cursor:pointer;box-shadow:0 0 0 4px rgba(244,198,107,.2);}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border:none;border-radius:50%;background:var(--amber);cursor:pointer;}
+
+  .toggle{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--muted);cursor:pointer;user-select:none;}
+  .toggle input{accent-color:var(--amber);width:15px;height:15px;cursor:pointer;}
+
+  .vcard{border:1px solid var(--panel-line);border-radius:18px;overflow:hidden;background:#02030a;margin-top:18px;position:relative;}
+  #vertical{display:block;width:100%;height:170px;}
+  .vlabel{position:absolute;left:16px;top:13px;font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.26em;text-transform:uppercase;color:rgba(220,225,245,.5);}
+
+  .notes{
+    margin-top:26px;border:1px solid var(--panel-line);border-radius:18px;padding:22px 24px;
+    background:rgba(10,13,26,.5);color:var(--muted);font-size:13.5px;line-height:1.85;
+  }
+  .notes b{color:var(--amber-soft);font-weight:700;}
+  .notes .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px 28px;margin-top:6px;}
+  .notes .grid div span{display:block;font-family:"Space Mono",monospace;color:var(--cyan);font-size:18px;margin-top:3px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Milky Way · Solar Orbit</div>
+    <h1>은하 속 <span class="em">태양</span>의 공전</h1>
+    <p class="lede">태양은 멈춰 있지 않습니다. 약 <b>초속 230km</b>의 속도로 은하 중심을 따라 돌며, 한 바퀴(은하년)를 도는 데 약 <b>2억 3천만 년</b>이 걸립니다. 동시에 은하면을 위아래로 가로지르는 진동도 합니다.</p>
+  </header>
+
+  <div class="stage">
+    <div class="canvas-card">
+      <canvas id="galaxy"></canvas>
+      <div class="stamp"><span class="dot">●</span> TOP VIEW · 은하면 수직 위에서 본 모습</div>
+    </div>
+
+    <div class="side">
+      <div class="panel">
+        <h2>실시간 데이터</h2>
+        <div class="readout">
+          <div class="stat">
+            <div class="lab">경과 시간</div>
+            <div class="val"><span id="elapsed">0</span><small>백만 년</small></div>
+          </div>
+          <div class="stat">
+            <div class="lab">완성한 공전 (은하년)</div>
+            <div class="val"><span id="years">0.00</span><small>바퀴</small></div>
+            <div class="bar"><i id="orbitbar"></i></div>
+          </div>
+          <div class="stat">
+            <div class="lab">공전 속도</div>
+            <div class="val">230<small>km/s</small></div>
+          </div>
+          <div class="stat">
+            <div class="lab">은하 중심까지 거리</div>
+            <div class="val">26,000<small>광년 · 8.2 kpc</small></div>
+          </div>
+          <div class="stat">
+            <div class="lab">은하면으로부터 높이</div>
+            <div class="val"><span id="height">0</span><small>광년 (수직 진동)</small></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>조작</h2>
+        <div class="controls">
+          <div class="speed">
+            <label>시간 속도 <span class="now" id="speedval">1.0×</span></label>
+            <input id="speed" type="range" min="0" max="100" value="38">
+          </div>
+          <div class="row">
+            <button class="primary" id="play">⏸ 일시정지</button>
+            <button id="reset">↺ 처음으로</button>
+          </div>
+          <label class="toggle"><input type="checkbox" id="trail" checked> 공전 궤도·잔상 표시</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="vcard">
+    <canvas id="vertical"></canvas>
+    <div class="vlabel">SIDE VIEW · 은하면을 가로지르는 수직 진동 (주기 ≈ 7천만 년)</div>
+  </div>
+
+  <div class="notes">
+    이 시뮬레이션은 실제 측정값을 바탕으로 한 <b>개념 모형</b>입니다. 은하 구조와 별의 수는 시각적 표현이며, 나선팔은 정지 상태로 두고 태양의 공전만 강조했습니다.
+    <div class="grid">
+      <div>공전 속도<span>≈ 230 km/s</span></div>
+      <div>은하년 (1회 공전)<span>≈ 230 Myr</span></div>
+      <div>중심까지 거리<span>≈ 8.2 kpc</span></div>
+      <div>수직 진동 주기<span>≈ 70 Myr</span></div>
+      <div>지구 나이로 환산<span>≈ 20 바퀴</span></div>
+      <div>우리 은하 형태<span>막대 나선 은하</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---------- physics constants ----------
+  const GAL_YEAR = 230;      // Myr per orbit
+  const V_PERIOD = 70;       // Myr per vertical oscillation
+  const V_AMPL   = 230;      // light-years above/below plane (approx)
+  const BASE_RATE = 6;       // Myr per real second at 1x
+
+  let elapsed = 0;           // Myr
+  let playing = true;
+  let showTrail = true;
+  let speedMul = 1;
+  let last = performance.now();
+
+  // ---------- speed slider (log scale 0.1x .. 30x) ----------
+  const speed = document.getElementById('speed');
+  const speedval = document.getElementById('speedval');
+  function sliderToSpeed(v){ // 0..100 -> 0.1 .. 30 (log)
+    const t = v/100;
+    return Math.pow(10, -1 + t*(Math.log10(30)+1));
+  }
+  function refreshSpeed(){
+    speedMul = sliderToSpeed(+speed.value);
+    speedval.textContent = (speedMul<1?speedMul.toFixed(2):speedMul.toFixed(1))+'×';
+  }
+  speed.addEventListener('input', refreshSpeed); refreshSpeed();
+
+  document.getElementById('play').addEventListener('click', e=>{
+    playing=!playing; e.target.textContent = playing?'⏸ 일시정지':'▶ 재생';
+  });
+  document.getElementById('reset').addEventListener('click', ()=>{ elapsed=0; trailPts.length=0; });
+  document.getElementById('trail').addEventListener('change', e=> showTrail=e.target.checked);
+
+  // ---------- galaxy canvas ----------
+  const cv = document.getElementById('galaxy');
+  const ctx = cv.getContext('2d');
+  let W=0,H=0,CX=0,CY=0,maxR=0,dpr=1;
+  let galaxyLayer=null;
+  const sunOrbitFrac = 0.55;   // Sun radius as fraction of maxR
+  let sunR=0;
+  const trailPts=[];
+
+  // pre-generated stars stored in normalized coords, rendered to offscreen
+  let starData=[];
+
+  function genStars(){
+    starData=[];
+    const arms=4, sep=(Math.PI*2)/arms, twist=2.7, N=4200;
+    for(let i=0;i<N;i++){
+      const rn=Math.pow(Math.random(),0.62);          // bias toward center
+      const r=rn;                                       // 0..1
+      const arm=Math.floor(Math.random()*arms);
+      let ang=arm*sep + r*twist*Math.PI;
+      const fuzz=(Math.random()-0.5)*(0.55*(1-r*0.55));
+      ang+=fuzz;
+      const rr=r + (Math.random()-0.5)*0.04;
+      // color: warm/yellow near core, blue-white in arms, occasional red
+      let col;
+      const c=Math.random();
+      if(r<0.18){ col = c<0.7?'255,222,170':'255,200,140'; }
+      else if(c<0.18) col='150,185,255';
+      else if(c<0.30) col='255,180,150';
+      else col='235,240,255';
+      starData.push({
+        x:Math.cos(ang)*rr, y:Math.sin(ang)*rr,
+        s:Math.random()*1.3+0.3,
+        a:Math.random()*0.6+0.35,
+        col
+      });
+    }
+  }
+
+  function buildGalaxyLayer(){
+    galaxyLayer=document.createElement('canvas');
+    galaxyLayer.width=cv.width; galaxyLayer.height=cv.height;
+    const g=galaxyLayer.getContext('2d');
+    g.scale(dpr,dpr);
+    // central glow
+    const core=g.createRadialGradient(CX,CY,0,CX,CY,maxR*0.95);
+    core.addColorStop(0,'rgba(255,224,170,0.55)');
+    core.addColorStop(0.10,'rgba(255,196,120,0.32)');
+    core.addColorStop(0.30,'rgba(120,110,170,0.12)');
+    core.addColorStop(0.65,'rgba(60,70,130,0.06)');
+    core.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=core; g.beginPath(); g.arc(CX,CY,maxR,0,7); g.fill();
+
+    // central bar (barred spiral)
+    g.save();
+    g.translate(CX,CY); g.rotate(-0.5);
+    const bar=g.createLinearGradient(-maxR*0.28,0,maxR*0.28,0);
+    bar.addColorStop(0,'rgba(255,200,130,0)');
+    bar.addColorStop(0.5,'rgba(255,222,170,0.5)');
+    bar.addColorStop(1,'rgba(255,200,130,0)');
+    g.fillStyle=bar;
+    g.beginPath(); g.ellipse(0,0,maxR*0.28,maxR*0.085,0,0,7); g.fill();
+    g.restore();
+
+    // stars
+    g.globalCompositeOperation='lighter';
+    for(const st of starData){
+      const x=CX+st.x*maxR, y=CY+st.y*maxR;
+      g.beginPath();
+      g.fillStyle='rgba('+st.col+','+st.a+')';
+      g.arc(x,y,st.s,0,7); g.fill();
+    }
+    g.globalCompositeOperation='source-over';
+  }
+
+  function resize(){
+    const rect=cv.getBoundingClientRect();
+    dpr=Math.min(window.devicePixelRatio||1,2);
+    cv.width=rect.width*dpr; cv.height=rect.width*dpr; // square
+    W=rect.width; H=rect.width; CX=W/2; CY=H/2; maxR=W*0.46; sunR=maxR*sunOrbitFrac;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    buildGalaxyLayer();
+    resizeV();
+  }
+
+  function drawGalaxy(){
+    ctx.clearRect(0,0,W,H);
+    ctx.drawImage(galaxyLayer,0,0,W,H);
+
+    const theta = (elapsed/GAL_YEAR)*Math.PI*2 - Math.PI/2;
+    const sx=CX+Math.cos(theta)*sunR, sy=CY+Math.sin(theta)*sunR;
+
+    if(showTrail){
+      // faint full orbit
+      ctx.beginPath(); ctx.arc(CX,CY,sunR,0,7);
+      ctx.strokeStyle='rgba(244,198,107,0.18)'; ctx.lineWidth=1; ctx.stroke();
+      // bright trailing arc (last ~0.35 turn)
+      const span=Math.PI*0.7;
+      const grad=ctx.createLinearGradient(sx,sy,CX,CY);
+      ctx.beginPath(); ctx.arc(CX,CY,sunR,theta-span,theta);
+      ctx.strokeStyle='rgba(255,226,122,0.55)'; ctx.lineWidth=2.4;
+      ctx.shadowColor='rgba(255,210,90,0.8)'; ctx.shadowBlur=8; ctx.stroke(); ctx.shadowBlur=0;
+    }
+
+    // Sun glow
+    const gl=ctx.createRadialGradient(sx,sy,0,sx,sy,16);
+    gl.addColorStop(0,'rgba(255,240,190,0.95)');
+    gl.addColorStop(0.4,'rgba(255,210,90,0.55)');
+    gl.addColorStop(1,'rgba(255,180,60,0)');
+    ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(sx,sy,16,0,7); ctx.fill();
+    ctx.fillStyle='#fff6d8'; ctx.beginPath(); ctx.arc(sx,sy,3,0,7); ctx.fill();
+
+    // labels
+    ctx.font='12px "Space Mono", monospace';
+    ctx.fillStyle='rgba(255,236,180,0.95)'; ctx.textAlign='left';
+    ctx.fillText('☉ 태양', sx+12, sy-8);
+    ctx.fillStyle='rgba(255,210,150,0.85)'; ctx.textAlign='center';
+    ctx.fillText('은하 중심', CX, CY-maxR*0.30);
+    // tiny center marker
+    ctx.fillStyle='rgba(255,240,210,0.9)'; ctx.beginPath(); ctx.arc(CX,CY,2,0,7); ctx.fill();
+  }
+
+  // ---------- vertical (side) view ----------
+  const vc=document.getElementById('vertical');
+  const vx=vc.getContext('2d');
+  let VW=0,VH=0;
+  function resizeV(){
+    const r=vc.getBoundingClientRect();
+    vc.width=r.width*dpr; vc.height=170*dpr;
+    VW=r.width; VH=170;
+    vx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  function drawVertical(){
+    vx.clearRect(0,0,VW,VH);
+    const mid=VH/2;
+    // disk band (edge-on)
+    const band=vx.createLinearGradient(0,mid-26,0,mid+26);
+    band.addColorStop(0,'rgba(120,140,210,0)');
+    band.addColorStop(0.5,'rgba(170,160,220,0.22)');
+    band.addColorStop(1,'rgba(120,140,210,0)');
+    vx.fillStyle=band; vx.fillRect(0,mid-26,VW,52);
+    // plane line
+    vx.strokeStyle='rgba(244,198,107,0.25)'; vx.setLineDash([5,6]); vx.lineWidth=1;
+    vx.beginPath(); vx.moveTo(0,mid); vx.lineTo(VW,mid); vx.stroke(); vx.setLineDash([]);
+    vx.font='10px "Space Mono",monospace'; vx.fillStyle='rgba(244,198,107,0.6)'; vx.textAlign='right';
+    vx.fillText('은하면', VW-12, mid-6);
+
+    // horizontal position cycles with orbit; vertical bobs with V_PERIOD
+    const px = ((elapsed/GAL_YEAR)%1) * (VW-40) + 20;
+    const h = Math.sin((elapsed/V_PERIOD)*Math.PI*2);
+    const py = mid - h*34;
+
+    // trail of recent points
+    trailPts.push([px,py]);
+    if(trailPts.length>90) trailPts.shift();
+    vx.beginPath();
+    for(let i=0;i<trailPts.length;i++){
+      const p=trailPts[i];
+      if(Math.abs(p[0]-px)>VW*0.6) {vx.moveTo(p[0],p[1]);continue;}
+      i===0?vx.moveTo(p[0],p[1]):vx.lineTo(p[0],p[1]);
+    }
+    vx.strokeStyle='rgba(255,226,122,0.35)'; vx.lineWidth=1.5; vx.stroke();
+
+    const gl=vx.createRadialGradient(px,py,0,px,py,12);
+    gl.addColorStop(0,'rgba(255,240,190,0.95)');
+    gl.addColorStop(1,'rgba(255,180,60,0)');
+    vx.fillStyle=gl; vx.beginPath(); vx.arc(px,py,12,0,7); vx.fill();
+    vx.fillStyle='#fff6d8'; vx.beginPath(); vx.arc(px,py,2.6,0,7); vx.fill();
+    return h*V_AMPL;
+  }
+
+  // ---------- readouts ----------
+  const elEl=document.getElementById('elapsed');
+  const elY=document.getElementById('years');
+  const elBar=document.getElementById('orbitbar');
+  const elH=document.getElementById('height');
+  function fmt(n){return Math.round(n).toLocaleString('ko-KR');}
+
+  function updateReadout(height){
+    elEl.textContent=fmt(elapsed);
+    const yrs=elapsed/GAL_YEAR;
+    elY.textContent=yrs.toFixed(2);
+    elBar.style.width=((yrs%1)*100).toFixed(1)+'%';
+    const sign=height>=0?'+':'−';
+    elH.textContent=sign+fmt(Math.abs(height));
+  }
+
+  // ---------- loop ----------
+  function loop(now){
+    const dt=Math.min((now-last)/1000,0.05); last=now;
+    if(playing) elapsed += dt*BASE_RATE*speedMul;
+    drawGalaxy();
+    const h=drawVertical();
+    updateReadout(h);
+    requestAnimationFrame(loop);
+  }
+
+  genStars();
+  resize();
+  window.addEventListener('resize',()=>{ const o=performance.now(); resize(); last=o; });
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
