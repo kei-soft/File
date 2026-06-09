@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>루미너스 — AI 솔루션 파트너</title>
+    <meta name="description" content="기업의 AI 전환을 가장 빠르고 안전하게. 루미너스는 반복 업무를 자동화하고 데이터 기반 의사결정을 가능하게 합니다.">
+
+    <!-- Pretendard Variable Font -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Iconify Solar -->
+    <script src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Pretendard Variable', 'Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background-color: #0a0a0a;
+            color: #f4f4f5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+        }
+
+        .keep-all { word-break: keep-all; }
+
+        /* Noise texture overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 60;
+            opacity: 0.5;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            33%       { transform: translateY(-18px) rotate(0.8deg); }
+            66%       { transform: translateY(-8px) rotate(-0.8deg); }
+        }
+
+        @keyframes floatB {
+            0%, 100% { transform: translateY(0px); }
+            50%       { transform: translateY(-12px); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(2rem); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulseBlue {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.5; }
+        }
+
+        .animate-float  { animation: float  7s ease-in-out infinite; }
+        .animate-float2 { animation: floatB 5s ease-in-out infinite 1.5s; }
+        .animate-float3 { animation: floatB 9s ease-in-out infinite 3s; }
+        .pulse-dot      { animation: pulseBlue 2s ease-in-out infinite; }
+
+        .fade-in-up { animation: fadeInUp 0.9s cubic-bezier(0.16,1,0.3,1) forwards; opacity: 0; }
+        [data-d="1"] { animation-delay: 0.08s; }
+        [data-d="2"] { animation-delay: 0.18s; }
+        [data-d="3"] { animation-delay: 0.28s; }
+        [data-d="4"] { animation-delay: 0.38s; }
+        [data-d="5"] { animation-delay: 0.50s; }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #fff 0%, #93c5fd 55%, #2563eb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            filter: blur(90px);
+        }
+
+        /* Scroll reveal */
+        .reveal {
+            opacity: 0;
+            transform: translateY(28px);
+            transition: opacity 0.75s cubic-bezier(0.16,1,0.3,1),
+                        transform 0.75s cubic-bezier(0.16,1,0.3,1);
+        }
+        .reveal.visible { opacity: 1; transform: translateY(0); }
+
+        /* Interactive elements */
+        .btn-primary {
+            transition: transform 0.3s cubic-bezier(0.16,1,0.3,1),
+                        box-shadow 0.3s cubic-bezier(0.16,1,0.3,1);
+        }
+        .btn-primary:hover  { transform: scale(1.02); }
+        .btn-primary:active { transform: scale(0.98); }
+
+        .card-lift {
+            transition: transform 0.4s cubic-bezier(0.16,1,0.3,1),
+                        border-color 0.3s ease;
+        }
+        .card-lift:hover {
+            transform: translateY(-5px);
+            border-color: rgba(59,130,246,0.3) !important;
+        }
+
+        .logo-item {
+            filter: grayscale(1) brightness(0.55);
+            transition: filter 0.35s ease;
+        }
+        .logo-item:hover { filter: grayscale(0) brightness(1); }
+
+        .nav-link {
+            transition: color 0.2s cubic-bezier(0.16,1,0.3,1),
+                        background-color 0.2s ease;
+        }
+
+        /* Mobile overlay */
+        #mobile-overlay {
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ─────────────────────────────────────────────────────────────────────────
+     NAVIGATION — Floating glass pill
+───────────────────────────────────────────────────────────────────────────── -->
+<header class="fixed top-5 left-0 right-0 z-40 flex justify-center px-4">
+    <nav class="flex items-center gap-1 px-4 py-2.5 rounded-full"
+         style="backdrop-filter:blur(20px); background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); box-shadow:0 8px 40px rgba(0,0,0,0.5);">
+
+        <!-- Logotype -->
+        <a href="#" class="flex items-center gap-2 mr-3">
+            <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                 style="background:#2563EB;">
+                <iconify-icon icon="solar:stars-bold" style="color:#fff; font-size:14px;"></iconify-icon>
+            </div>
+            <span class="font-bold text-white text-sm tracking-tight">루미너스</span>
+        </a>
+
+        <!-- Desktop links -->
+        <div class="hidden md:flex items-center gap-0.5">
+            <a href="#features"      class="nav-link px-3.5 py-1.5 text-sm text-zinc-400 hover:text-white rounded-full hover:bg-white/5">기능</a>
+            <a href="#services"      class="nav-link px-3.5 py-1.5 text-sm text-zinc-400 hover:text-white rounded-full hover:bg-white/5">서비스</a>
+            <a href="#testimonials"  class="nav-link px-3.5 py-1.5 text-sm text-zinc-400 hover:text-white rounded-full hover:bg-white/5">고객 후기</a>
+            <a href="#pricing"       class="nav-link px-3.5 py-1.5 text-sm text-zinc-400 hover:text-white rounded-full hover:bg-white/5">가격</a>
+        </div>
+
+        <div class="flex items-center gap-2 ml-3">
+            <a href="#contact"
+               class="hidden sm:block text-sm text-zinc-400 hover:text-white transition-colors px-3 py-1.5">로그인</a>
+            <a href="#contact"
+               class="px-5 py-2 text-sm font-semibold text-white rounded-full btn-primary"
+               style="background:#2563EB;">무료 시작</a>
+            <button id="menu-btn"
+                    class="md:hidden p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                    onclick="toggleMobile()">
+                <iconify-icon icon="solar:hamburger-menu-linear" style="color:#fff; font-size:18px;"></iconify-icon>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile full-screen overlay -->
+    <div id="mobile-overlay"
+         class="fixed inset-0 z-50 flex-col items-center justify-center hidden"
+         style="background:rgba(10,10,10,0.97); backdrop-filter:blur(24px);">
+        <button onclick="toggleMobile()"
+                class="absolute top-5 right-5 w-10 h-10 flex items-center justify-center rounded-full"
+                style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12);">
+            <iconify-icon icon="solar:close-linear" style="color:#fff; font-size:20px;"></iconify-icon>
+        </button>
+        <nav class="flex flex-col items-center gap-7">
+            <a href="#features"     onclick="toggleMobile()" class="text-2xl font-medium text-zinc-300 hover:text-white transition-colors">기능</a>
+            <a href="#services"     onclick="toggleMobile()" class="text-2xl font-medium text-zinc-300 hover:text-white transition-colors">서비스</a>
+            <a href="#testimonials" onclick="toggleMobile()" class="text-2xl font-medium text-zinc-300 hover:text-white transition-colors">고객 후기</a>
+            <a href="#pricing"      onclick="toggleMobile()" class="text-2xl font-medium text-zinc-300 hover:text-white transition-colors">가격</a>
+            <a href="#contact"      onclick="toggleMobile()"
+               class="mt-4 px-10 py-4 text-lg font-semibold text-white rounded-full btn-primary"
+               style="background:#2563EB; box-shadow:0 0 40px rgba(37,99,235,0.45);">무료로 시작하기</a>
+        </nav>
+    </div>
+</header>
+
+
+<main>
+<!-- ─────────────────────────────────────────────────────────────────────────
+     HERO — 60/40 split layout
+───────────────────────────────────────────────────────────────────────────── -->
+<section class="relative min-h-[100dvh] flex items-center overflow-hidden" style="background:#0a0a0a;">
+    <!-- Ambient orbs -->
+    <div class="orb animate-float"
+         style="width:560px;height:560px;background:radial-gradient(circle,rgba(37,99,235,0.18),transparent);top:-8%;right:-4%;opacity:1;"></div>
+    <div class="orb animate-float2"
+         style="width:380px;height:380px;background:radial-gradient(circle,rgba(29,78,216,0.14),transparent);bottom:8%;left:-6%;opacity:1;"></div>
+    <div class="orb animate-float3"
+         style="width:280px;height:280px;background:radial-gradient(circle,rgba(59,130,246,0.12),transparent);top:45%;left:28%;opacity:1;"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-32 pb-24">
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-14 items-center">
+
+            <!-- Left col: 3/5 -->
+            <div class="lg:col-span-3 space-y-8">
+                <div class="fade-in-up" data-d="1">
+                    <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium tracking-[0.13em] uppercase"
+                          style="background:rgba(37,99,235,0.14);border:1px solid rgba(37,99,235,0.32);color:#93c5fd;">
+                        <span class="w-1.5 h-1.5 rounded-full bg-blue-400 pulse-dot"></span>
+                        Enterprise AI Platform
+                    </span>
+                </div>
+
+                <h1 class="fade-in-up keep-all font-bold leading-tight tracking-tight text-5xl md:text-6xl lg:text-7xl" data-d="2">
+                    <span class="text-white">AI로 비즈니스의</span><br>
+                    <span class="gradient-text">미래를 설계하다</span>
+                </h1>
+
+                <p class="fade-in-up keep-all text-lg text-zinc-400 leading-relaxed max-w-[54ch]" data-d="3">
+                    루미너스는 기업의 핵심 업무에 AI를 접목해 반복 작업을 자동화하고, 데이터 기반 의사결정을 가능하게 합니다. 도입 후 평균 <strong class="text-zinc-200 font-semibold">3.2배</strong>의 업무 효율이 증가했습니다.
+                </p>
+
+                <div class="fade-in-up flex flex-wrap gap-4 items-center" data-d="4">
+                    <a href="#contact"
+                       class="inline-flex items-center gap-3 px-8 py-4 text-base font-semibold text-white rounded-full btn-primary"
+                       style="background:#2563EB; box-shadow:0 0 50px rgba(37,99,235,0.45);">
+                        무료로 시작하기
+                        <span class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                              style="background:rgba(0,0,0,0.22);">
+                            <iconify-icon icon="solar:arrow-right-linear" style="font-size:13px;color:#fff;"></iconify-icon>
+                        </span>
+                    </a>
+                    <a href="#features"
+                       class="inline-flex items-center gap-2.5 px-5 py-4 text-base text-zinc-400 hover:text-white transition-colors">
+                        <iconify-icon icon="solar:play-circle-linear" style="font-size:22px;"></iconify-icon>
+                        데모 영상 보기
+                    </a>
+                </div>
+
+                <div class="fade-in-up flex flex-wrap items-center gap-6 pt-1" data-d="5">
+                    <div class="flex items-center gap-2">
+                        <iconify-icon icon="solar:shield-check-linear" style="color:#60a5fa;font-size:18px;"></iconify-icon>
+                        <span class="text-sm text-zinc-500">ISO 27001 인증</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <iconify-icon icon="solar:lock-linear" style="color:#60a5fa;font-size:18px;"></iconify-icon>
+                        <span class="text-sm text-zinc-500">SOC 2 Type II</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <iconify-icon icon="solar:check-circle-linear" style="color:#60a5fa;font-size:18px;"></iconify-icon>
+                        <span class="text-sm text-zinc-500">GDPR 준수</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right col: 2/5 — Dashboard mockup (Double-Bezel) -->
+            <div class="lg:col-span-2 fade-in-up relative" data-d="3">
+                <div class="rounded-[2rem] p-1.5 animate-float"
+                     style="background:rgba(255,255,255,0.045);border:1px solid rgba(255,255,255,0.1);">
+                    <div class="rounded-[1.75rem] p-6 overflow-hidden"
+                         style="background:rgba(12,12,18,0.96);border:1px solid rgba(255,255,255,0.06);box-shadow:inset 0 1px 1px rgba(255,255,255,0.08);">
+
+                        <!-- Header -->
+                        <div class="flex items-center justify-between mb-5">
+                            <div>
+                                <p class="text-xs text-zinc-600 mb-0.5">AI 분석 대시보드</p>
+                                <p class="text-base font-semibold text-white">실시간 성과 현황</p>
+                            </div>
+                            <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+                                 style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.22);">
+                                <span class="w-1.5 h-1.5 rounded-full bg-green-400 pulse-dot"></span>
+                                <span class="text-xs text-green-400">실시간</span>
+                            </div>
+                        </div>
+
+                        <!-- KPI row -->
+                        <div class="grid grid-cols-3 gap-2.5 mb-4">
+                            <div class="rounded-2xl p-3.5"
+                                 style="background:rgba(37,99,235,0.12);border:1px solid rgba(37,99,235,0.22);">
+                                <p class="text-xs text-zinc-500 mb-1">자동화율</p>
+                                <p class="text-xl font-bold text-white tabular-nums">89.4%</p>
+                                <p class="text-xs text-green-400 mt-0.5 flex items-center gap-0.5">
+                                    <iconify-icon icon="solar:arrow-up-linear" style="font-size:10px;"></iconify-icon>+12.3%
+                                </p>
+                            </div>
+                            <div class="rounded-2xl p-3.5"
+                                 style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);">
+                                <p class="text-xs text-zinc-500 mb-1">처리 속도</p>
+                                <p class="text-xl font-bold text-white tabular-nums">4.7x</p>
+                                <p class="text-xs text-blue-400 mt-0.5 flex items-center gap-0.5">
+                                    <iconify-icon icon="solar:arrow-up-linear" style="font-size:10px;"></iconify-icon>향상
+                                </p>
+                            </div>
+                            <div class="rounded-2xl p-3.5"
+                                 style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);">
+                                <p class="text-xs text-zinc-500 mb-1">비용 절감</p>
+                                <p class="text-xl font-bold text-white tabular-nums">63%</p>
+                                <p class="text-xs text-green-400 mt-0.5 flex items-center gap-0.5">
+                                    <iconify-icon icon="solar:arrow-up-linear" style="font-size:10px;"></iconify-icon>절감
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Chart -->
+                        <div class="rounded-2xl p-4 mb-4"
+                             style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);">
+                            <div class="flex items-center justify-between mb-3">
+                                <p class="text-sm font-medium text-zinc-300">월별 AI 처리 건수</p>
+                                <span class="text-xs text-zinc-600">최근 6개월</span>
+                            </div>
+                            <svg viewBox="0 0 280 70" class="w-full" style="overflow:visible;">
+                                <defs>
+                                    <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%"   stop-color="#2563EB" stop-opacity="0.38"/>
+                                        <stop offset="100%" stop-color="#2563EB" stop-opacity="0"/>
+                                    </linearGradient>
+                                </defs>
+                                <path d="M0 58 L46 44 L92 36 L138 23 L184 14 L230 6 L280 3 L280 70 L0 70Z" fill="url(#cg)"/>
+                                <path d="M0 58 L46 44 L92 36 L138 23 L184 14 L230 6 L280 3"
+                                      fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <circle cx="46"  cy="44" r="3" fill="#3B82F6"/>
+                                <circle cx="92"  cy="36" r="3" fill="#3B82F6"/>
+                                <circle cx="138" cy="23" r="3" fill="#3B82F6"/>
+                                <circle cx="184" cy="14" r="3" fill="#3B82F6"/>
+                                <circle cx="230" cy="6"  r="3" fill="#3B82F6"/>
+                                <circle cx="280" cy="3"  r="3" fill="#3B82F6"/>
+                            </svg>
+                            <div class="flex justify-between mt-1.5">
+                                <span class="text-xs text-zinc-700">1월</span>
+                                <span class="text-xs text-zinc-700">2월</span>
+                                <span class="text-xs text-zinc-700">3월</span>
+                                <span class="text-xs text-zinc-700">4월</span>
+                                <span class="text-xs text-zinc-700">5월</span>
+                                <span class="text-xs text-zinc-700">6월</span>
+                            </div>
+                        </div>
+
+                        <!-- Activity feed -->
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-3 p-3 rounded-xl"
+                                 style="background:rgba(255,255,255,0.03);">
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                                     style="background:rgba(37,99,235,0.2);">
+                                    <iconify-icon icon="solar:bolt-linear" style="color:#60a5fa;font-size:13px;"></iconify-icon>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs text-zinc-300 truncate">문서 자동화 파이프라인 완료</p>
+                                    <p class="text-xs text-zinc-600">3,847건 처리</p>
+                                </div>
+                                <span class="text-xs text-zinc-700 flex-shrink-0">방금</span>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 rounded-xl"
+                                 style="background:rgba(255,255,255,0.03);">
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                                     style="background:rgba(34,197,94,0.15);">
+                                    <iconify-icon icon="solar:chart-linear" style="color:#4ade80;font-size:13px;"></iconify-icon>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs text-zinc-300 truncate">월간 보고서 AI 생성 완료</p>
+                                    <p class="text-xs text-zinc-600">12개 팀 배포</p>
+                                </div>
+                                <span class="text-xs text-zinc-700 flex-shrink-0">2분 전</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Floating rating badge -->
+                <div class="absolute -top-5 -right-3 px-4 py-2.5 rounded-2xl animate-float2"
+                     style="background:rgba(12,12,18,0.97);border:1px solid rgba(37,99,235,0.42);box-shadow:0 8px 30px rgba(37,99,235,0.2);">
+                    <div class="flex items-center gap-2">
+                        <iconify-icon icon="solar:star-bold" style="color:#fbbf24;font-size:14px;"></iconify-icon>
+                        <span class="text-sm font-bold text-white">4.93</span>
+                        <span class="text-xs text-zinc-500">/ 1,247개 리뷰</span>
+                    </div>
+                </div>
+
+                <!-- Floating user count -->
+                <div class="absolute -bottom-5 -left-3 px-4 py-3 rounded-2xl animate-float3"
+                     style="background:rgba(12,12,18,0.97);border:1px solid rgba(255,255,255,0.1);box-shadow:0 8px 30px rgba(0,0,0,0.45);">
+                    <div class="flex items-center gap-3">
+                        <div class="flex -space-x-2">
+                            <img src="https://i.pravatar.cc/150?u=hayunmain"
+                                 class="w-7 h-7 rounded-full" style="border:2px solid #0a0a0a;"
+                                 alt="" loading="lazy" decoding="async">
+                            <img src="https://i.pravatar.cc/150?u=dohyunmain"
+                                 class="w-7 h-7 rounded-full" style="border:2px solid #0a0a0a;"
+                                 alt="" loading="lazy" decoding="async">
+                            <img src="https://i.pravatar.cc/150?u=seojinmain"
+                                 class="w-7 h-7 rounded-full" style="border:2px solid #0a0a0a;"
+                                 alt="" loading="lazy" decoding="async">
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium text-white">47,200+ 기업 이용 중</p>
+                            <p class="text-xs text-zinc-600">이번 달 1,834개 신규 가입</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────────────────────
+     SOCIAL PROOF — Metrics + Logo cloud
+───────────────────────────────────────────────────────────────────────────── -->
+<section class="py-20" style="background:rgba(255,255,255,0.012);border-top:1px solid rgba(255,255,255,0.06);border-bottom:1px solid rgba(255,255,255,0.06);">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        <!-- Metrics -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-10 mb-14">
+            <div class="reveal text-center">
+                <p class="text-4xl md:text-5xl font-bold text-white tabular-nums">47,200<span class="text-blue-400">+</span></p>
+                <p class="text-sm text-zinc-500 mt-2">도입 기업 수</p>
+            </div>
+            <div class="reveal text-center">
+                <p class="text-4xl md:text-5xl font-bold text-white tabular-nums">3.2<span class="text-blue-400">배</span></p>
+                <p class="text-sm text-zinc-500 mt-2">평균 업무 효율 향상</p>
+            </div>
+            <div class="reveal text-center">
+                <p class="text-4xl md:text-5xl font-bold text-white tabular-nums">99.97<span class="text-blue-400">%</span></p>
+                <p class="text-sm text-zinc-500 mt-2">서비스 가용성</p>
+            </div>
+            <div class="reveal text-center">
+                <p class="text-4xl md:text-5xl font-bold text-white tabular-nums">8.7<span class="text-blue-400">초</span></p>
+                <p class="text-sm text-zinc-500 mt-2">평균 응답 속도</p>
+            </div>
+        </div>
+
+        <!-- Divider -->
+        <div class="flex items-center gap-6 mb-10">
+            <div class="flex-1 h-px" style="background:rgba(255,255,255,0.07);"></div>
+            <p class="text-xs text-zinc-600 flex-shrink-0 tracking-[0.14em] uppercase">신뢰하는 기업들</p>
+            <div class="flex-1 h-px" style="background:rgba(255,255,255,0.07);"></div>
+        </div>
+
+        <!-- Logo cloud -->
+        <div class="grid grid-cols-3 md:grid-cols-6 gap-8 items-center">
+            <div class="logo-item reveal flex justify-center">
+                <span class="text-lg font-bold text-zinc-400 tracking-tight">스텔라랩스</span>
+            </div>
+            <div class="logo-item reveal flex justify-center">
+                <span class="text-lg font-bold text-zinc-400 tracking-tight">베리파이</span>
+            </div>
+            <div class="logo-item reveal flex justify-center">
+                <span class="text-lg font-bold text-zinc-400 tracking-tight">클라우드원</span>
+            </div>
+            <div class="logo-item reveal flex justify-center">
+                <span class="text-lg font-bold text-zinc-400 tracking-tight">넥스트브릿지</span>
+            </div>
+            <div class="logo-item reveal flex justify-center">
+                <span class="text-lg font-bold text-zinc-400 tracking-tight">모멘텀IO</span>
+            </div>
+            <div class="logo-item reveal flex justify-center">
+                <span class="text-lg font-bold text-zinc-400 tracking-tight">인사이트AI</span>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────────────────────
+     FEATURES — Asymmetric Bento Grid
+───────────────────────────────────────────────────────────────────────────── -->
+<section id="features" class="py-24 md:py-32 lg:py-40" style="background:#0a0a0a;">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        <!-- Section header: left-aligned -->
+        <div class="max-w-2xl mb-16 reveal">
+            <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs tracking-[0.13em] uppercase mb-6"
+                  style="background:rgba(37,99,235,0.1);border:1px solid rgba(37,99,235,0.25);color:#93c5fd;">
+                핵심 기능
+            </span>
+            <h2 class="keep-all text-4xl md:text-5xl font-bold text-white leading-tight tracking-tight mb-6">
+                복잡한 업무를<br>
+                <span class="gradient-text">AI가 대신합니다</span>
+            </h2>
+            <p class="keep-all text-lg text-zinc-400 leading-relaxed">
+                반복적이고 시간이 소요되는 작업을 자동화하고, 데이터에서 즉시 인사이트를 추출하세요.
+            </p>
+        </div>
+
+        <!-- Bento grid (asymmetric: 2fr + 1fr top row, full-width bottom) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+
+            <!-- [A] Large feature — col-span 2 -->
+            <div class="md:col-span-2 rounded-[2rem] p-1.5 reveal card-lift"
+                 style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);">
+                <div class="rounded-[1.75rem] p-8 min-h-[300px] flex flex-col justify-between overflow-hidden relative"
+                     style="background:rgba(11,11,17,0.97);box-shadow:inset 0 1px 1px rgba(255,255,255,0.06);">
+                    <div class="absolute top-0 right-0 w-72 h-72 rounded-full pointer-events-none"
+                         style="background:radial-gradient(circle,rgba(37,99,235,0.18) 0%,transparent 70%);transform:translate(35%,-35%);"></div>
+                    <div>
+                        <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-6"
+                             style="background:rgba(37,99,235,0.15);border:1px solid rgba(37,99,235,0.28);">
+                            <iconify-icon icon="solar:cpu-bolt-linear" style="color:#60a5fa;font-size:24px;"></iconify-icon>
+                        </div>
+                        <h3 class="text-2xl font-bold text-white mb-3 keep-all">AI 업무 자동화</h3>
+                        <p class="keep-all text-zinc-400 leading-relaxed text-sm">
+                            문서 분류, 데이터 입력, 보고서 생성 등 반복 업무를 완전 자동화합니다. 평균 6.2시간 업무가 <strong class="text-zinc-200">8분</strong>으로 단축됐습니다.
+                        </p>
+                    </div>
+                    <div class="space-y-2 mt-6">
+                        <div class="flex items-center gap-3 p-3 rounded-xl"
+                             style="background:rgba(37,99,235,0.09);border:1px solid rgba(37,99,235,0.16);">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            <span class="text-sm text-zinc-300 keep-all">계약서 자동 검토 및 위험 요소 분석</span>
+                        </div>
+                        <div class="flex items-center gap-3 p-3 rounded-xl"
+                             style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            <span class="text-sm text-zinc-300 keep-all">월간·분기 실적 보고서 자동 작성</span>
+                        </div>
+                        <div class="flex items-center gap-3 p-3 rounded-xl"
+                             style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            <span class="text-sm text-zinc-300 keep-all">고객 문의 자동 분류 및 담당자 라우팅</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- [B] Data analysis — col-span 1 -->
+            <div class="md:col-span-1 rounded-[2rem] p-1.5 reveal card-lift"
+                 style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);">
+                <div class="rounded-[1.75rem] p-7 min-h-[300px] flex flex-col justify-between overflow-hidden relative"
+                     style="background:rgba(11,11,17,0.97);box-shadow:inset 0 1px 1px rgba(255,255,255,0.06);">
+                    <div class="absolute bottom-0 left-0 w-56 h-56 rounded-full pointer-events-none"
+                         style="background:radial-gradient(circle,rgba(16,185,129,0.14) 0%,transparent 70%);transform:translate(-30%,30%);"></div>
+                    <div>
+                        <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-6"
+                             style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.22);">
+                            <iconify-icon icon="solar:chart-2-linear" style="color:#34d399;font-size:24px;"></iconify-icon>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3 keep-all">지능형 데이터 분석</h3>
+                        <p class="keep-all text-zinc-400 text-sm leading-relaxed">
+                            방대한 데이터에서 인사이트를 즉시 추출하고 경영진용 시각화 리포트를 자동 생성합니다.
+                        </p>
+                    </div>
+                    <div class="p-4 rounded-2xl mt-6"
+                         style="background:rgba(16,185,129,0.09);border:1px solid rgba(16,185,129,0.18);">
+                        <p class="text-3xl font-bold text-white tabular-nums mb-1">98.3%</p>
+                        <p class="text-xs text-zinc-500">예측 정확도</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- [C] Chatbot — col-span 1 -->
+            <div class="md:col-span-1 rounded-[2rem] p-1.5 reveal card-lift"
+                 style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);">
+                <div class="rounded-[1.75rem] p-7 min-h-[220px] flex flex-col overflow-hidden"
+                     style="background:linear-gradient(145deg,rgba(37,99,235,0.14) 0%,rgba(11,11,17,0.97) 55%);box-shadow:inset 0 1px 1px rgba(255,255,255,0.06);">
+                    <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5"
+                         style="background:rgba(37,99,235,0.2);border:1px solid rgba(37,99,235,0.32);">
+                        <iconify-icon icon="solar:chat-round-dots-linear" style="color:#60a5fa;font-size:24px;"></iconify-icon>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-2 keep-all">AI 챗봇</h3>
+                    <p class="keep-all text-zinc-400 text-sm leading-relaxed flex-1">
+                        24/7 고객 응대, 정확한 내부 정보 검색, 다국어 지원까지 한 번에.
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2 mt-4">
+                        <span class="text-xs px-2.5 py-1 rounded-full"
+                              style="background:rgba(37,99,235,0.15);color:#93c5fd;border:1px solid rgba(37,99,235,0.25);">한국어</span>
+                        <span class="text-xs px-2.5 py-1 rounded-full"
+                              style="background:rgba(255,255,255,0.05);color:#a1a1aa;border:1px solid rgba(255,255,255,0.09);">English</span>
+                        <span class="text-xs px-2.5 py-1 rounded-full"
+                              style="background:rgba(255,255,255,0.05);color:#a1a1aa;border:1px solid rgba(255,255,255,0.09);">日本語</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- [D] Custom AI model — col-span 2 -->
+            <div class="md:col-span-2 rounded-[2rem] p-1.5 reveal card-lift"
+                 style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);">
+                <div class="rounded-[1.75rem] p-7 flex flex-col sm:flex-row gap-6 items-start"
+                     style="background:rgba(11,11,17,0.97);box-shadow:inset 0 1px 1px rgba(255,255,255,0.06);">
+                    <div class="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+                         style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.22);">
+                        <iconify-icon icon="solar:code-square-linear" style="color:#fbbf24;font-size:24px;"></iconify-icon>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-2 keep-all">맞춤형 AI 모델 개발</h3>
+                        <p class="keep-all text-zinc-400 text-sm leading-relaxed">
+                            업종과 데이터에 최적화된 전용 AI 모델을 구축합니다. 범용 AI 대비 평균 <strong class="text-zinc-300">41%</strong> 높은 정확도를 제공합니다.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- [E] Enterprise security — col-span 2 -->
+            <div class="md:col-span-2 rounded-[2rem] p-1.5 reveal card-lift"
+                 style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);">
+                <div class="rounded-[1.75rem] p-7 flex flex-col sm:flex-row gap-6 items-start"
+                     style="background:rgba(11,11,17,0.97);box-shadow:inset 0 1px 1px rgba(255,255,255,0.06);">
+                    <div class="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+                         style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.22);">
+                        <iconify-icon icon="solar:shield-network-linear" style="color:#a78bfa;font-size:24px;"></iconify-icon>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-2 keep-all">엔터프라이즈 보안</h3>
+                        <p class="keep-all text-zinc-400 text-sm leading-relaxed">
+                            ISO 27001, SOC 2 Type II 인증 기반의 보안 인프라. 모든 데이터는 온프레미스 또는 격리된 프라이빗 클라우드에서 처리됩니다.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────────────────────
+     SERVICES — Zig-zag alternating layout
+───────────────────────────────────────────────────────────────────────────── -->
+<section id="services" class="py-24 md:py-32"
+         style="background:rgba(255,255,255,0.013);border-top:1px solid rgba(255,255,255,0.05);">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        <div class="text-center mb-20 reveal">
+            <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs tracking-[0.13em] uppercase mb-6"
+                  style="background:rgba(37,99,235,0.1);border:1px solid rgba(37,99,235,0.25);color:#93c5fd;">
+                서비스 소개
+            </span>
+            <h2 class="keep-all text-4xl md:text-5xl font-bold text-white leading-tight tracking-tight">
+                도입부터 운영까지<br>
+                <span class="gradient-text">전 과정을 지원합니다</span>
+            </h2>
+        </div>
+
+        <!-- Row 1: Image left, text right -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-28">
+            <div class="reveal rounded-[2rem] overflow-hidden aspect-[4/3]"
+                 style="border:1px solid rgba(255,255,255,0.07);">
+                <img src="https://picsum.photos/seed/luminous-consult/800/600"
+                     alt="AI 컨설팅"
+                     class="w-full h-full object-cover"
+                     style="opacity:0.68;"
+                     loading="lazy" decoding="async">
+            </div>
+            <div class="reveal space-y-6">
+                <p class="inline-flex items-center gap-2 text-sm text-blue-400">
+                    <iconify-icon icon="solar:star-linear" style="font-size:14px;"></iconify-icon>
+                    01. 진단 및 컨설팅
+                </p>
+                <h3 class="keep-all text-3xl font-bold text-white leading-snug">현업 전문가가 직접<br>AI 도입을 진단합니다</h3>
+                <p class="keep-all text-zinc-400 leading-relaxed">
+                    500개 이상의 AI 프로젝트 경험을 보유한 전문 컨설턴트가 현재 업무 프로세스를 분석하고, ROI를 극대화할 수 있는 AI 도입 로드맵을 설계합니다.
+                </p>
+                <ul class="space-y-3">
+                    <li class="flex items-start gap-3">
+                        <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;margin-top:2px;"></iconify-icon>
+                        <span class="keep-all text-zinc-300 text-sm">현업 분석을 통한 자동화 가능 업무 발굴</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;margin-top:2px;"></iconify-icon>
+                        <span class="keep-all text-zinc-300 text-sm">예상 ROI 및 비용 절감 효과 사전 산정</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;margin-top:2px;"></iconify-icon>
+                        <span class="keep-all text-zinc-300 text-sm">단계별 AI 도입 로드맵 제공</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Row 2: Text left, image right -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <div class="reveal space-y-6 lg:order-1">
+                <p class="inline-flex items-center gap-2 text-sm text-blue-400">
+                    <iconify-icon icon="solar:bolt-circle-linear" style="font-size:14px;"></iconify-icon>
+                    02. 구축 및 배포
+                </p>
+                <h3 class="keep-all text-3xl font-bold text-white leading-snug">평균 14일 안에<br>실무에 바로 적용됩니다</h3>
+                <p class="keep-all text-zinc-400 leading-relaxed">
+                    검증된 AI 파이프라인 템플릿과 기업 맞춤 파인튜닝을 통해 빠른 도입이 가능합니다. 기존 ERP, CRM과의 완전한 API 연동을 지원합니다.
+                </p>
+                <ul class="space-y-3">
+                    <li class="flex items-start gap-3">
+                        <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;margin-top:2px;"></iconify-icon>
+                        <span class="keep-all text-zinc-300 text-sm">기존 ERP·CRM 원클릭 연동</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;margin-top:2px;"></iconify-icon>
+                        <span class="keep-all text-zinc-300 text-sm">온프레미스 / 프라이빗 클라우드 배포 지원</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;margin-top:2px;"></iconify-icon>
+                        <span class="keep-all text-zinc-300 text-sm">전담 엔지니어의 기술 지원 및 트레이닝</span>
+                    </li>
+                </ul>
+            </div>
+            <div class="reveal lg:order-2 rounded-[2rem] overflow-hidden aspect-[4/3]"
+                 style="border:1px solid rgba(255,255,255,0.07);">
+                <img src="https://picsum.photos/seed/luminous-deploy/800/600"
+                     alt="AI 배포"
+                     class="w-full h-full object-cover"
+                     style="opacity:0.68;"
+                     loading="lazy" decoding="async">
+            </div>
+        </div>
+
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────────────────────
+     TESTIMONIALS — Masonry-style grid
+───────────────────────────────────────────────────────────────────────────── -->
+<section id="testimonials" class="py-24 md:py-32 lg:py-40"
+         style="background:#0a0a0a;border-top:1px solid rgba(255,255,255,0.05);">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        <div class="mb-16 reveal">
+            <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs tracking-[0.13em] uppercase mb-6"
+                  style="background:rgba(37,99,235,0.1);border:1px solid rgba(37,99,235,0.25);color:#93c5fd;">
+                고객 후기
+            </span>
+            <h2 class="keep-all text-4xl md:text-5xl font-bold text-white leading-tight tracking-tight">
+                현장에서 직접<br>
+                <span class="gradient-text">검증된 성과</span>
+            </h2>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            <!-- Large testimonial: col-span 2 -->
+            <div class="md:col-span-2 rounded-[2rem] p-8 reveal"
+                 style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);">
+                <div class="flex items-start gap-4 mb-6">
+                    <img src="https://i.pravatar.cc/150?u=hayunseo2"
+                         class="w-12 h-12 rounded-full flex-shrink-0"
+                         style="border:2px solid rgba(37,99,235,0.45);"
+                         alt="" loading="lazy" decoding="async">
+                    <div>
+                        <p class="font-semibold text-white">하윤서</p>
+                        <p class="text-sm text-zinc-500">CTO, 스텔라랩스</p>
+                    </div>
+                    <div class="ml-auto flex gap-0.5 flex-shrink-0">
+                        <iconify-icon icon="solar:star-bold" style="color:#fbbf24;font-size:13px;"></iconify-icon>
+                        <iconify-icon icon="solar:star-bold" style="color:#fbbf24;font-size:13px;"></iconify-icon>
+                        <iconify-icon icon="solar:star-bold" style="color:#fbbf24;font-size:13px;"></iconify-icon>
+                        <iconify-icon icon="solar:star-bold" style="color:#fbbf24;font-size:13px;"></iconify-icon>
+                        <iconify-icon icon="solar:star-bold" style="color:#fbbf24;font-size:13px;"></iconify-icon>
+                    </div>
+                </div>
+                <p class="keep-all text-zinc-300 leading-relaxed text-lg">
+                    "계약서 검토 업무에 루미너스를 적용한 결과, 담당자 4명이 하루 8시간씩 소요하던 업무가 12분으로 줄었습니다. 오탐율도 기존 대비 91% 감소했어요. 우리 팀 모두가 이제 AI 없이는 일하기 어렵다고 합니다."
+                </p>
+                <div class="mt-6 flex flex-wrap items-center gap-6">
+                    <div>
+                        <p class="text-2xl font-bold text-white tabular-nums">97%</p>
+                        <p class="text-xs text-zinc-500 mt-0.5">업무 시간 단축</p>
+                    </div>
+                    <div class="w-px h-8" style="background:rgba(255,255,255,0.1);"></div>
+                    <div>
+                        <p class="text-2xl font-bold text-white tabular-nums">91%</p>
+                        <p class="text-xs text-zinc-500 mt-0.5">오탐율 감소</p>
+                    </div>
+                    <div class="w-px h-8" style="background:rgba(255,255,255,0.1);"></div>
+                    <div>
+                        <p class="text-2xl font-bold text-white tabular-nums">4명→0.2명</p>
+                        <p class="text-xs text-zinc-500 mt-0.5">담당 인력</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Short testimonial -->
+            <div class="md:col-span-1 rounded-[2rem] p-7 reveal flex flex-col"
+                 style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);">
+                <div class="flex items-start gap-3 mb-5">
+                    <img src="https://i.pravatar.cc/150?u=parkdohyun2"
+                         class="w-10 h-10 rounded-full flex-shrink-0"
+                         alt="" loading="lazy" decoding="async">
+                    <div>
+                        <p class="font-semibold text-white text-sm">박도현</p>
+                        <p class="text-xs text-zinc-500">데이터 분석팀장, 베리파이</p>
+                    </div>
+                </div>
+                <p class="keep-all text-zinc-400 text-sm leading-relaxed flex-1">
+                    "월 단위 리포트 작성에 팀 전체 2주를 쏟았는데, 지금은 버튼 하나로 6시간 안에 완성됩니다. 경영진 보고 퀄리티도 훨씬 좋아졌어요."
+                </p>
+                <div class="mt-5 p-4 rounded-2xl"
+                     style="background:rgba(37,99,235,0.09);border:1px solid rgba(37,99,235,0.18);">
+                    <p class="text-xl font-bold text-white tabular-nums">2주 → 6시간</p>
+                    <p class="text-xs text-zinc-500 mt-0.5">리포트 작성 시간</p>
+                </div>
+            </div>
+
+            <!-- Medium testimonial -->
+            <div class="md:col-span-1 rounded-[2rem] p-7 reveal"
+                 style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);">
+                <div class="flex items-start gap-3 mb-5">
+                    <img src="https://i.pravatar.cc/150?u=leeseojin2"
+                         class="w-10 h-10 rounded-full flex-shrink-0"
+                         alt="" loading="lazy" decoding="async">
+                    <div>
+                        <p class="font-semibold text-white text-sm">이서진</p>
+                        <p class="text-xs text-zinc-500">운영기획팀, 클라우드원</p>
+                    </div>
+                </div>
+                <p class="keep-all text-zinc-400 text-sm leading-relaxed">
+                    "고객 문의 중 78%가 AI로 자동 처리됩니다. 상담사들이 복잡한 케이스에만 집중할 수 있게 됐고, 고객 만족도가 4.1점에서 4.87점으로 올랐습니다."
+                </p>
+            </div>
+
+            <!-- Wide testimonial: col-span 2 -->
+            <div class="md:col-span-2 rounded-[2rem] p-7 reveal"
+                 style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);">
+                <div class="flex items-start gap-3 mb-5">
+                    <img src="https://i.pravatar.cc/150?u=kimjunho2"
+                         class="w-10 h-10 rounded-full flex-shrink-0"
+                         alt="" loading="lazy" decoding="async">
+                    <div>
+                        <p class="font-semibold text-white text-sm">김준호</p>
+                        <p class="text-xs text-zinc-500">대표이사, 넥스트브릿지</p>
+                    </div>
+                </div>
+                <p class="keep-all text-zinc-300 leading-relaxed">
+                    "처음에는 도입 비용이 부담됐습니다. 하지만 3개월 만에 전액 회수했고, 현재는 연간 8억 원의 비용 절감 효과를 보고 있습니다. 루미너스 없이 이 규모의 성장을 달성하기는 어려웠을 겁니다."
+                </p>
+                <div class="mt-5 flex flex-wrap items-center gap-2">
+                    <span class="text-sm px-3 py-1 rounded-full"
+                          style="background:rgba(37,99,235,0.1);color:#93c5fd;border:1px solid rgba(37,99,235,0.22);">ROI 3개월 회수</span>
+                    <span class="text-sm px-3 py-1 rounded-full"
+                          style="background:rgba(16,185,129,0.1);color:#6ee7b7;border:1px solid rgba(16,185,129,0.22);">연 8억 비용 절감</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────────────────────
+     PRICING — 3-column grid
+───────────────────────────────────────────────────────────────────────────── -->
+<section id="pricing" class="py-24 md:py-32"
+         style="background:rgba(255,255,255,0.013);border-top:1px solid rgba(255,255,255,0.05);">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        <div class="text-center mb-16 reveal">
+            <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs tracking-[0.13em] uppercase mb-6"
+                  style="background:rgba(37,99,235,0.1);border:1px solid rgba(37,99,235,0.25);color:#93c5fd;">
+                요금제
+            </span>
+            <h2 class="keep-all text-4xl md:text-5xl font-bold text-white leading-tight tracking-tight">
+                합리적인 가격으로<br>
+                <span class="gradient-text">시작하세요</span>
+            </h2>
+            <p class="keep-all text-zinc-400 mt-5 max-w-lg mx-auto">
+                14일 무료 체험 후 결제. 신용카드 없이 시작하고, 언제든지 해지할 수 있습니다.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-5xl mx-auto">
+
+            <!-- Starter -->
+            <div class="rounded-[2rem] p-1.5 reveal card-lift"
+                 style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);">
+                <div class="rounded-[1.75rem] p-8 h-full flex flex-col"
+                     style="background:rgba(11,11,17,0.97);box-shadow:inset 0 1px 1px rgba(255,255,255,0.06);">
+                    <p class="text-xs text-zinc-500 tracking-[0.1em] uppercase mb-2">스타터</p>
+                    <div class="mb-8">
+                        <p class="text-4xl font-bold text-white tabular-nums">₩89,000</p>
+                        <p class="text-sm text-zinc-500 mt-1">/ 월</p>
+                    </div>
+                    <ul class="space-y-3 flex-1 mb-8">
+                        <li class="flex items-center gap-2.5 text-sm text-zinc-400">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            월 10,000건 AI 처리
+                        </li>
+                        <li class="flex items-center gap-2.5 text-sm text-zinc-400">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            3개 자동화 파이프라인
+                        </li>
+                        <li class="flex items-center gap-2.5 text-sm text-zinc-400">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            이메일 기술 지원
+                        </li>
+                        <li class="flex items-center gap-2.5 text-sm text-zinc-600">
+                            <iconify-icon icon="solar:close-circle-linear" style="color:#3f3f46;flex-shrink:0;"></iconify-icon>
+                            맞춤형 AI 모델
+                        </li>
+                    </ul>
+                    <a href="#contact"
+                       class="block text-center px-6 py-3.5 rounded-full text-sm font-medium text-white btn-primary"
+                       style="background:rgba(255,255,255,0.09);border:1px solid rgba(255,255,255,0.14);">
+                        무료 체험 시작
+                    </a>
+                </div>
+            </div>
+
+            <!-- Pro (featured) -->
+            <div class="rounded-[2rem] p-1.5 reveal card-lift relative"
+                 style="background:rgba(37,99,235,0.28);border:1px solid rgba(37,99,235,0.55);box-shadow:0 0 70px rgba(37,99,235,0.22);">
+                <div class="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-semibold text-white"
+                     style="background:#2563EB;">
+                    가장 인기
+                </div>
+                <div class="rounded-[1.75rem] p-8 h-full flex flex-col"
+                     style="background:rgba(10,10,20,0.98);box-shadow:inset 0 1px 1px rgba(255,255,255,0.08);">
+                    <p class="text-xs text-blue-400 tracking-[0.1em] uppercase mb-2">프로</p>
+                    <div class="mb-8">
+                        <p class="text-4xl font-bold text-white tabular-nums">₩340,000</p>
+                        <p class="text-sm text-zinc-500 mt-1">/ 월</p>
+                    </div>
+                    <ul class="space-y-3 flex-1 mb-8">
+                        <li class="flex items-center gap-2.5 text-sm text-zinc-300">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            월 100,000건 AI 처리
+                        </li>
+                        <li class="flex items-center gap-2.5 text-sm text-zinc-300">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            무제한 자동화 파이프라인
+                        </li>
+                        <li class="flex items-center gap-2.5 text-sm text-zinc-300">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            전화 + 슬랙 전담 지원
+                        </li>
+                        <li class="flex items-center gap-2.5 text-sm text-zinc-300">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            맞춤형 AI 파인튜닝
+                        </li>
+                    </ul>
+                    <a href="#contact"
+                       class="block text-center px-6 py-3.5 rounded-full text-sm font-semibold text-white btn-primary"
+                       style="background:#2563EB;box-shadow:0 0 35px rgba(37,99,235,0.45);">
+                        지금 시작하기
+                    </a>
+                </div>
+            </div>
+
+            <!-- Enterprise -->
+            <div class="rounded-[2rem] p-1.5 reveal card-lift"
+                 style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);">
+                <div class="rounded-[1.75rem] p-8 h-full flex flex-col"
+                     style="background:rgba(11,11,17,0.97);box-shadow:inset 0 1px 1px rgba(255,255,255,0.06);">
+                    <p class="text-xs text-zinc-500 tracking-[0.1em] uppercase mb-2">엔터프라이즈</p>
+                    <div class="mb-8">
+                        <p class="text-4xl font-bold text-white">맞춤 협의</p>
+                        <p class="text-sm text-zinc-500 mt-1">규모에 따라 산정</p>
+                    </div>
+                    <ul class="space-y-3 flex-1 mb-8">
+                        <li class="flex items-center gap-2.5 text-sm text-zinc-400">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            무제한 처리
+                        </li>
+                        <li class="flex items-center gap-2.5 text-sm text-zinc-400">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            온프레미스 배포
+                        </li>
+                        <li class="flex items-center gap-2.5 text-sm text-zinc-400">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            24/7 전담 엔지니어
+                        </li>
+                        <li class="flex items-center gap-2.5 text-sm text-zinc-400">
+                            <iconify-icon icon="solar:check-circle-bold" style="color:#60a5fa;flex-shrink:0;"></iconify-icon>
+                            SLA 99.99% 보장
+                        </li>
+                    </ul>
+                    <a href="#contact"
+                       class="block text-center px-6 py-3.5 rounded-full text-sm font-medium text-white btn-primary"
+                       style="background:rgba(255,255,255,0.09);border:1px solid rgba(255,255,255,0.14);">
+                        영업팀 문의
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────────────────────
+     CTA — Full-bleed conversion
+───────────────────────────────────────────────────────────────────────────── -->
+<section id="contact" class="py-24 md:py-32 relative overflow-hidden"
+         style="background:#0a0a0a;border-top:1px solid rgba(255,255,255,0.05);">
+    <div class="absolute inset-0 pointer-events-none"
+         style="background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(37,99,235,0.11) 0%,transparent 70%);"></div>
+
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative reveal">
+        <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs tracking-[0.13em] uppercase mb-8"
+              style="background:rgba(37,99,235,0.1);border:1px solid rgba(37,99,235,0.25);color:#93c5fd;">
+            지금 바로 시작하세요
+        </span>
+
+        <h2 class="keep-all text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight mb-6">
+            14일 무료 체험으로<br>
+            <span class="gradient-text">직접 확인하세요</span>
+        </h2>
+
+        <p class="keep-all text-lg text-zinc-400 leading-relaxed max-w-xl mx-auto mb-12">
+            신용카드 없이 시작하세요. 14일간 프로 플랜의 모든 기능을 무료로 이용하고 효과를 직접 체감하세요.
+        </p>
+
+        <!-- Email + CTA form -->
+        <div class="flex flex-col sm:flex-row gap-3 max-w-md mx-auto mb-8">
+            <input type="email"
+                   placeholder="업무용 이메일을 입력하세요"
+                   class="flex-1 px-5 py-4 rounded-full text-sm text-white placeholder-zinc-600 outline-none focus:ring-1 focus:ring-blue-500"
+                   style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.13);">
+            <button class="px-7 py-4 rounded-full text-sm font-semibold text-white whitespace-nowrap btn-primary flex-shrink-0"
+                    style="background:#2563EB;box-shadow:0 0 45px rgba(37,99,235,0.42);">
+                무료로 시작하기
+            </button>
+        </div>
+
+        <p class="text-xs text-zinc-600 mb-14">
+            신용카드 불필요 &nbsp;·&nbsp; 14일 후 자동 해지 &nbsp;·&nbsp; SOC 2 인증 보안
+        </p>
+
+        <!-- Trust badges -->
+        <div class="flex flex-wrap justify-center gap-8">
+            <div class="flex items-center gap-2">
+                <iconify-icon icon="solar:shield-check-bold" style="color:#60a5fa;font-size:20px;"></iconify-icon>
+                <span class="text-sm text-zinc-400">SOC 2 Type II</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <iconify-icon icon="solar:lock-bold" style="color:#60a5fa;font-size:20px;"></iconify-icon>
+                <span class="text-sm text-zinc-400">256-bit 암호화</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <iconify-icon icon="solar:server-bold" style="color:#60a5fa;font-size:20px;"></iconify-icon>
+                <span class="text-sm text-zinc-400">국내 데이터센터</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <iconify-icon icon="solar:headphones-round-sound-bold" style="color:#60a5fa;font-size:20px;"></iconify-icon>
+                <span class="text-sm text-zinc-400">24/7 기술 지원</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+</main>
+
+
+<!-- ─────────────────────────────────────────────────────────────────────────
+     FOOTER
+───────────────────────────────────────────────────────────────────────────── -->
+<footer class="py-16" style="background:rgba(5,5,8,1);border-top:1px solid rgba(255,255,255,0.07);">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-10 mb-14">
+
+            <!-- Brand -->
+            <div class="col-span-2">
+                <div class="flex items-center gap-2 mb-4">
+                    <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                         style="background:#2563EB;">
+                        <iconify-icon icon="solar:stars-bold" style="color:#fff;font-size:14px;"></iconify-icon>
+                    </div>
+                    <span class="font-bold text-white tracking-tight">루미너스</span>
+                </div>
+                <p class="keep-all text-sm text-zinc-500 leading-relaxed max-w-[240px]">
+                    기업의 AI 전환을 가장 빠르고 안전하게 도와드립니다.
+                </p>
+                <div class="flex items-center gap-2.5 mt-6">
+                    <a href="#" class="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-white/10"
+                       style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);">
+                        <iconify-icon icon="solar:twitter-linear" style="color:#71717a;font-size:14px;"></iconify-icon>
+                    </a>
+                    <a href="#" class="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-white/10"
+                       style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);">
+                        <iconify-icon icon="solar:linkedin-linear" style="color:#71717a;font-size:14px;"></iconify-icon>
+                    </a>
+                    <a href="#" class="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-white/10"
+                       style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);">
+                        <iconify-icon icon="solar:youtube-linear" style="color:#71717a;font-size:14px;"></iconify-icon>
+                    </a>
+                </div>
+            </div>
+
+            <div>
+                <p class="text-sm font-semibold text-zinc-300 mb-4">제품</p>
+                <ul class="space-y-3">
+                    <li><a href="#" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">기능 소개</a></li>
+                    <li><a href="#" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">가격 안내</a></li>
+                    <li><a href="#" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">통합 연동</a></li>
+                    <li><a href="#" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">API 문서</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <p class="text-sm font-semibold text-zinc-300 mb-4">회사</p>
+                <ul class="space-y-3">
+                    <li><a href="#" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">소개</a></li>
+                    <li><a href="#" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">블로그</a></li>
+                    <li><a href="#" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">채용</a></li>
+                    <li><a href="#" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">파트너십</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <p class="text-sm font-semibold text-zinc-300 mb-4">고객 지원</p>
+                <ul class="space-y-3">
+                    <li><a href="#" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">도움말 센터</a></li>
+                    <li><a href="#" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">문의하기</a></li>
+                    <li><a href="#" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">서비스 상태</a></li>
+                    <li><a href="#" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">보안 정책</a></li>
+                </ul>
+            </div>
+
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-8"
+             style="border-top:1px solid rgba(255,255,255,0.07);">
+            <p class="text-xs text-zinc-600">© 2026 루미너스 Inc. All rights reserved.</p>
+            <div class="flex items-center gap-6">
+                <a href="#" class="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">개인정보처리방침</a>
+                <a href="#" class="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">이용약관</a>
+                <a href="#" class="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">쿠키 설정</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+
+<script>
+    // ── Mobile menu ──────────────────────────────────────────────────────────
+    function toggleMobile() {
+        const overlay = document.getElementById('mobile-overlay');
+        const isHidden = overlay.classList.contains('hidden');
+        overlay.classList.toggle('hidden', !isHidden);
+        overlay.classList.toggle('flex', isHidden);
+    }
+
+    // ── Scroll reveal ────────────────────────────────────────────────────────
+    const io = new IntersectionObserver((entries) => {
+        entries.forEach((entry, i) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add('visible');
+            io.unobserve(entry.target);
+        });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.reveal').forEach((el, idx) => {
+        el.style.transitionDelay = `${(idx % 5) * 0.07}s`;
+        io.observe(el);
+    });
+</script>
+
+</body>
+</html>
