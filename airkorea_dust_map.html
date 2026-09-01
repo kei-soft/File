@@ -83,6 +83,7 @@ body.map-only #restoreUiBtn{display:block}
     <option value="pm10">PM10 미세먼지</option>
     <option value="pm25">PM2.5 초미세먼지</option>
   </select>
+  <input id="minValue" type="number" inputmode="numeric" min="0" step="1" placeholder="최소 수치 이상만 표시" style="width:170px">
   <input id="key" type="password" value="Kk7ABzGu5oZwWK4S1xD6%2B%2FeFbyGQP7k3k9ViWsBPjW1W6LoB2bEsDzLZcJIV%2FtruHQgS9zq%2FLuGTnWEHbxl0fA%3D%3D" placeholder="공공데이터포털 일반 인증키 (Encoding/Decoding 둘 다 가능)">
   <button class="primary" id="load">전국 조회</button>
   <button id="test">API 키 테스트</button>
@@ -205,6 +206,13 @@ function render(){
     const lat=Number(x.dmX),lng=Number(x.dmY);
     if(!Number.isFinite(lat)||!Number.isFinite(lng))continue;
     const v=valid(x[key])?Number(x[key]):null;
+    const minRaw = $("minValue").value.trim();
+    const minValue = minRaw === "" ? null : Number(minRaw);
+
+    if(minValue !== null && Number.isFinite(minValue)){
+      if(v === null || v < minValue) continue;
+    }
+
     if(v!==null)values++;
     const [g,c]=grade(type,v);
     const m=L.circleMarker([lat,lng],{
@@ -296,6 +304,7 @@ async function loadAll(){
 $("test").onclick=testKey;
 $("load").onclick=loadAll;
 $("pollutant").onchange=()=>{ render(); updateLegendBox(); };
+$("minValue").addEventListener("input", ()=>{ render(); updateLegendBox(); });
 map.on("zoomend",()=>{
   const show=map.getZoom()>=7;
   layers.forEach(m=>{
@@ -326,11 +335,14 @@ function updateLegendBox(target){
   const type = document.getElementById("pollutant").value;
   const title = type === "pm25" ? "PM2.5 등급" : "PM10 등급";
 
+  const minRaw = $("minValue") ? $("minValue").value.trim() : "";
+  const filterText = minRaw ? '<hr style="border:0;border-top:1px solid #ddd;margin:5px 0">표시 기준: <b>'+minRaw+' 이상</b>' : '';
+
   d.innerHTML='<b>'+title+'</b><br>'+
    '<span class="dot" style="background:#2563eb"></span>좋음<br>'+
    '<span class="dot" style="background:#16a34a"></span>보통<br>'+
    '<span class="dot" style="background:#f97316"></span>나쁨<br>'+
-   '<span class="dot" style="background:#dc2626"></span>매우 나쁨';
+   '<span class="dot" style="background:#dc2626"></span>매우 나쁨'+filterText;
 }
 
 
