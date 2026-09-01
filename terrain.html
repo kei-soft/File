@@ -38,6 +38,43 @@
     gap: 16px;
   }
 
+  /* 지도만 보기: 패널을 부드럽게 감춘다. hidden 속성과 별개로 클래스로 제어한다. */
+  #hud.chrome-hidden {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0s linear 0.25s;
+  }
+
+  #ui-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 20;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-content: center;
+    font-size: 18px;
+    line-height: 1;
+    color: var(--accent);
+    background: var(--panel-fill);
+    border: 1px solid var(--panel-edge);
+    cursor: pointer;
+    backdrop-filter: blur(2px);
+    opacity: 0.5;
+    transition: opacity 0.2s ease, border-color 0.2s ease;
+  }
+  #ui-toggle:hover      { opacity: 1; border-color: var(--accent); }
+  #ui-toggle:focus-visible { opacity: 1; outline: 1px solid var(--paper); outline-offset: 2px; }
+  #ui-toggle[hidden]    { display: none; }
+  /* 패널이 숨겨졌을 때는 버튼도 평소엔 옅게, 마우스를 올리면 진하게. */
+  body.chrome-hidden #ui-toggle { opacity: 0.28; }
+  body.chrome-hidden #ui-toggle:hover { opacity: 1; }
+
+  @media (max-width: 900px) {
+    #ui-toggle { top: 12px; right: 12px; opacity: 0.75; }
+  }
+
   .panel {
     background: var(--panel-fill);
     border: 1px solid var(--panel-edge);
@@ -301,11 +338,15 @@
     <div class="muted">휠 확대 · 축소</div>
     <div class="muted">터치: 한 손가락 회전, 두 손가락 이동</div>
     <div class="muted">지형 위에 커서를 두면 고도가 표시됩니다</div>
-    <div class="row"><span class="muted">키 안내</span><b class="key">R T P S</b></div>
+    <div class="row"><span class="muted">키 안내</span><b class="key">R T P S H</b></div>
   </section>
 
   <div id="status">— × — · — fps</div>
 </div>
+
+<button id="ui-toggle" hidden aria-label="화면 정보 숨기기" title="화면 정보 숨기기 (H)">
+  <span id="ui-toggle-icon">◑</span>
+</button>
 
 <div id="loader">
   <h2>고도 데이터를 불러오세요</h2>
@@ -406,6 +447,7 @@ const state = {
   minimumElevation    : 0,
   maximumElevation    : 0,
   renderLoopStarted   : false,
+  chromeHidden        : false,
   pendingPointer      : null,
   restoredCamera      : null,
   frameCount          : 0,
@@ -1093,6 +1135,25 @@ function updateStatusHint() {
     : "단면: 시작점을 찍으세요";
 }
 
+// 지도만 보기. 패널 전체를 숨기고, 다시 켤 수 있게 토글 버튼만 남긴다.
+function setChromeHidden(isHidden) {
+  state.chromeHidden = isHidden;
+  hudElement.classList.toggle("chrome-hidden", isHidden);
+  document.body.classList.toggle("chrome-hidden", isHidden);
+
+  const toggleButton = document.getElementById("ui-toggle");
+  document.getElementById("ui-toggle-icon").textContent = isHidden ? "◐" : "◑";
+  toggleButton.setAttribute("aria-label", isHidden ? "화면 정보 표시하기" : "화면 정보 숨기기");
+  toggleButton.setAttribute("title",      isHidden ? "화면 정보 표시하기 (H)" : "화면 정보 숨기기 (H)");
+
+  // 패널이 숨겨져 있으면 단면 찍기 안내가 떠 있어도 소용없으니 단면 모드를 접는다.
+  if (isHidden && state.sectionMode) clearSection();
+}
+
+function toggleChrome() {
+  setChromeHidden(!state.chromeHidden);
+}
+
 function refreshHud() {
   document.getElementById("value-scale").textContent     = state.exaggeration.toFixed(1);
   document.getElementById("value-contour").textContent   = state.contourVisible ? "켜짐" : "꺼짐";
@@ -1303,6 +1364,7 @@ function startViewer(terrainData) {
   updateCursorReadout(null);
   loaderElement.classList.add("hidden");
   hudElement.hidden = false;
+  document.getElementById("ui-toggle").hidden = false;
 
   if (!state.renderLoopStarted) {
     state.renderLoopStarted = true;
@@ -1378,6 +1440,11 @@ hudElement.addEventListener("click", (event) => {
   ACTION_TABLE[target.dataset.action]?.();
 });
 
+// 지도만 보기 토글. HUD 바깥에 있어 패널이 숨겨져도 계속 눌린다.
+document.getElementById("ui-toggle").addEventListener("click", () => {
+  if (state.terrainData) toggleChrome();
+});
+
 window.addEventListener("keydown", (event) => {
   if (!state.terrainData) return;
   const intervalByKey = { "1" : 25, "2" : 50, "3" : 100 };
@@ -1411,8 +1478,12 @@ window.addEventListener("keydown", (event) => {
     setTopView();
   } else if (event.key === "s" || event.key === "S") {
     captureScreen();
+  } else if (event.key === "h" || event.key === "H") {
+    toggleChrome();
   } else if (event.key === "r" || event.key === "R") {
     resetCamera();
+  } else if (event.key === "Escape" && state.chromeHidden) {
+    setChromeHidden(false);
   } else if (event.key === "Escape" && (state.sectionMode || state.sectionSampleList)) {
     clearSection();
   }
