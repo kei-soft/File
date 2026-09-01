@@ -17,14 +17,66 @@ button.primary{background:#111827;color:#fff;border-color:#111827}
 #status{padding:8px 16px;border-bottom:1px solid #ddd;font-size:13px;background:#fafafa;display:flex;gap:18px;flex-wrap:wrap}
 #map{flex:1;min-height:420px}
 .msg{position:fixed;z-index:9999;top:110px;left:50%;transform:translateX(-50%);max-width:850px;background:#111827;color:#fff;padding:10px 14px;border-radius:8px;display:none;font-size:13px}
-.legend{background:#fff;padding:9px 11px;border-radius:8px;box-shadow:0 1px 8px #999;font-size:12px;line-height:1.65}
+.legend{background:#fff;opacity:1;padding:9px 11px;border-radius:8px;box-shadow:0 1px 8px #999;font-size:12px;line-height:1.65}
 .dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px}
 .num-label{background:transparent;border:0;box-shadow:none;font-weight:900;font-size:14px;line-height:1;padding:0;color:#111;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,0 0 4px #fff}
 pre{white-space:pre-wrap}
 @media(max-width:700px){h1{width:100%}input{width:100%;flex:1}header{align-items:stretch}}
+
+#topWrap{background:#fff}
+#topWrap.collapsed header{display:none}
+.mobile-actions{
+  display:flex;gap:8px;align-items:center;padding:8px 10px;
+  background:#fff;border-bottom:1px solid #ddd;
+}
+.mobile-actions button{
+  height:38px;border:1px solid #cfd3d8;border-radius:8px;background:#fff;
+  padding:0 12px;font-weight:800;cursor:pointer
+}
+.mobile-actions .dark{background:#111827;color:#fff;border-color:#111827}
+#mapOnlyBtn.active{background:#111827;color:#fff;border-color:#111827}
+#locateBtn{margin-left:auto}
+body.map-only #topWrap{display:none}
+body.map-only #map{height:100vh}
+.locate-control{
+  background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:4px;
+  width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+  font-size:19px;font-weight:900;cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.18)
+}
+.locate-control:hover{background:#f3f4f6}
+@media(min-width:701px){
+  .mobile-actions{padding:6px 16px}
+}
+
+
+#restoreUiBtn{
+  position:fixed;
+  top:12px;
+  right:12px;
+  z-index:10000;
+  height:42px;
+  padding:0 14px;
+  border:1px solid rgba(255,255,255,.65);
+  border-radius:10px;
+  background:#111827;
+  color:#fff;
+  font-weight:900;
+  box-shadow:0 2px 10px rgba(0,0,0,.28);
+  display:none;
+  cursor:pointer;
+}
+body.map-only #restoreUiBtn{display:block}
+
 </style>
 </head>
 <body>
+<button id="restoreUiBtn" type="button">UI 보기</button>
+<div id="topWrap">
+<div class="mobile-actions">
+  <button id="collapseBtn">▲ 상단 접기</button>
+  <button id="mapOnlyBtn" class="dark">지도만 보기</button>
+  <button id="locateBtn">◎ 현재위치</button>
+</div>
 <header>
   <h1>전국 미세먼지 측정소 지도</h1>
   <select id="pollutant">
@@ -40,6 +92,7 @@ pre{white-space:pre-wrap}
   <span>측정소 <b id="cnt">0</b>개</span>
   <span>측정값 <b id="vcnt">0</b>개</span>
   <span id="state">인증키를 입력한 뒤 API 키 테스트를 먼저 눌러보세요.</span>
+</div>
 </div>
 <div id="msg" class="msg"></div>
 <div id="map"></div>
@@ -242,7 +295,7 @@ async function loadAll(){
 
 $("test").onclick=testKey;
 $("load").onclick=loadAll;
-$("pollutant").onchange=render;
+$("pollutant").onchange=()=>{ render(); updateLegendBox(); };
 map.on("zoomend",()=>{
   const show=map.getZoom()>=7;
   layers.forEach(m=>{
@@ -260,13 +313,116 @@ map.on("zoomend",()=>{
 const legend=L.control({position:"bottomright"});
 legend.onAdd=()=>{
  const d=L.DomUtil.create("div","legend");
- d.innerHTML='<b>PM 등급</b><br><span class="dot" style="background:#2563eb"></span>좋음<br>'+
- '<span class="dot" style="background:#16a34a"></span>보통<br>'+
- '<span class="dot" style="background:#f97316"></span>나쁨<br>'+
- '<span class="dot" style="background:#dc2626"></span>매우 나쁨';
+ d.id="legendBox";
+ updateLegendBox(d);
  return d;
 };
 legend.addTo(map);
+
+function updateLegendBox(target){
+  const d = target || document.getElementById("legendBox");
+  if(!d) return;
+
+  const type = document.getElementById("pollutant").value;
+  const title = type === "pm25" ? "PM2.5 등급" : "PM10 등급";
+
+  d.innerHTML='<b>'+title+'</b><br>'+
+   '<span class="dot" style="background:#2563eb"></span>좋음<br>'+
+   '<span class="dot" style="background:#16a34a"></span>보통<br>'+
+   '<span class="dot" style="background:#f97316"></span>나쁨<br>'+
+   '<span class="dot" style="background:#dc2626"></span>매우 나쁨';
+}
+
+
+const topWrap = document.getElementById("topWrap");
+const collapseBtn = document.getElementById("collapseBtn");
+const mapOnlyBtn = document.getElementById("mapOnlyBtn");
+const locateBtn = document.getElementById("locateBtn");
+
+const restoreUiBtn = document.getElementById("restoreUiBtn");
+
+restoreUiBtn.addEventListener("click", () => {
+  document.body.classList.remove("map-only");
+  mapOnlyBtn.classList.remove("active");
+  mapOnlyBtn.textContent = "지도만 보기";
+  setTimeout(() => map.invalidateSize(), 120);
+});
+
+
+collapseBtn.addEventListener("click", () => {
+  const isCollapsed = topWrap.classList.toggle("collapsed");
+  collapseBtn.textContent = isCollapsed ? "▼ 상단 펼치기" : "▲ 상단 접기";
+  setTimeout(() => map.invalidateSize(), 120);
+});
+
+mapOnlyBtn.addEventListener("click", () => {
+  const active = document.body.classList.toggle("map-only");
+  mapOnlyBtn.classList.toggle("active", active);
+  mapOnlyBtn.textContent = active ? "전체 화면 종료" : "지도만 보기";
+  setTimeout(() => map.invalidateSize(), 120);
+});
+
+function moveToCurrentLocation(){
+  if(!navigator.geolocation){
+    alertMsg("이 브라우저에서는 위치 정보를 지원하지 않습니다.");
+    return;
+  }
+
+  status("현재 위치를 확인하는 중...");
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const acc = pos.coords.accuracy;
+
+      if(window.__myLocationMarker){
+        map.removeLayer(window.__myLocationMarker);
+      }
+
+      window.__myLocationMarker = L.circleMarker([lat,lng],{
+        radius:10,
+        color:"#111827",
+        weight:3,
+        fillColor:"#ffffff",
+        fillOpacity:1
+      }).addTo(map).bindPopup(
+        "현재 위치<br>정확도 약 " + Math.round(acc) + "m"
+      );
+
+      map.setView([lat,lng], 14, {animate:true});
+      window.__myLocationMarker.openPopup();
+      status("현재 위치로 이동했습니다.");
+    },
+    err => {
+      let msg = "현재 위치를 가져오지 못했습니다.";
+      if(err.code===1) msg += " 위치 권한을 허용해주세요.";
+      else if(err.code===2) msg += " 위치 정보를 확인할 수 없습니다.";
+      else if(err.code===3) msg += " 위치 확인 시간이 초과되었습니다.";
+      alertMsg(msg, 7000);
+      status("현재 위치 조회 실패");
+    },
+    {
+      enableHighAccuracy:true,
+      timeout:10000,
+      maximumAge:30000
+    }
+  );
+}
+
+locateBtn.addEventListener("click", moveToCurrentLocation);
+
+// 지도 위에도 현재위치 버튼 추가
+const locateControl = L.control({position:"topleft"});
+locateControl.onAdd = function(){
+  const btn = L.DomUtil.create("button","locate-control");
+  btn.type = "button";
+  btn.title = "현재 위치";
+  btn.innerHTML = "◎";
+  L.DomEvent.disableClickPropagation(btn);
+  L.DomEvent.on(btn,"click",moveToCurrentLocation);
+  return btn;
+};
+locateControl.addTo(map);
 
 window.addEventListener("load", () => {
   setTimeout(() => {
