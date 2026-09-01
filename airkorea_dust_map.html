@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>전국 미세먼지 측정소 지도</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+  />
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1f2937; }
+    body { background: #f3f4f6; }
+    .app { height: 100%; display: flex; flex-direction: column; }
+
+    header {
+      min-height: 72px;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 18px;
+      z-index: 1000;
+      flex-wrap: wrap;
+    }
+    .title-wrap { margin-right: auto; }
+    h1 { margin: 0; font-size: 20px; }
+    .subtitle { margin-top: 3px; font-size: 12px; color: #6b7280; }
+
+    .control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    input, select, button {
+      height: 38px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      background: #fff;
+      padding: 0 10px;
+      font-size: 14px;
+    }
+    input { width: 280px; }
+    button { cursor: pointer; font-weight: 700; }
+    button.primary { background: #111827; color: #fff; border-color: #111827; }
+    button:hover { filter: brightness(.97); }
+
+    .stats {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 8px 18px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+      font-size: 13px;
+    }
+    .stat strong { font-size: 15px; }
+    #status { color: #4b5563; }
+
+    #map { flex: 1; min-height: 300px; }
+
+    .legend {
+      background: rgba(255,255,255,.96);
+      padding: 10px 12px;
+      border-radius: 10px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.14);
+      line-height: 1.6;
+      font-size: 12px;
+    }
+    .legend-row { display: flex; align-items: center; gap: 7px; }
+    .dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      display: inline-block; border: 1px solid rgba(0,0,0,.15);
+    }
+
+    .station-label {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      font-size: 11px;
+      font-weight: 800;
+      text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+      color: #111827;
+    }
+
+    .popup h3 { margin: 0 0 8px; font-size: 16px; }
+    .popup table { border-collapse: collapse; width: 100%; font-size: 12px; }
+    .popup td { padding: 4px 5px; border-bottom: 1px solid #eee; }
+    .popup td:first-child { color: #6b7280; width: 42%; }
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .notice {
+      position: absolute;
+      left: 50%;
+      top: 145px;
+      transform: translateX(-50%);
+      background: rgba(17,24,39,.92);
+      color: #fff;
+      padding: 9px 14px;
+      border-radius: 8px;
+      z-index: 1500;
+      font-size: 13px;
+      display: none;
+      max-width: min(92vw, 700px);
+      text-align: center;
+    }
+
+    @media (max-width: 760px) {
+      header { align-items: stretch; }
+      .title-wrap { width: 100%; }
+      .control { width: 100%; }
+      input { flex: 1; width: auto; min-width: 0; }
+      select { flex: 1; }
+      button { white-space: nowrap; }
+      .stats { gap: 10px 16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="title-wrap">
+      <h1>전국 미세먼지 측정소 지도</h1>
+      <div class="subtitle">한국환경공단 AirKorea · 측정소 위치 + 실시간 PM10 / PM2.5</div>
+    </div>
+
+    <div class="control">
+      <select id="pollutant">
+        <option value="pm10">PM10 미세먼지</option>
+        <option value="pm25">PM2.5 초미세먼지</option>
+      </select>
+    </div>
+
+    <div class="control">
+      <input id="serviceKey" type="password" placeholder="공공데이터포털 일반 인증키(Decoding)" />
+      <button class="primary" id="loadBtn">전국 조회</button>
+    </div>
+
+    <button id="sampleBtn">샘플 보기</button>
+  </header>
+
+  <div class="stats">
+    <span class="stat">표시 측정소 <strong id="stationCount">0</strong>개</span>
+    <span class="stat">정상 측정값 <strong id="valueCount">0</strong>개</span>
+    <span id="status">API 키를 입력하고 ‘전국 조회’를 누르세요.</span>
+  </div>
+
+  <div id="notice" class="notice"></div>
+  <div id="map"></div>
+</div>
+
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  crossorigin="">
+</script>
+
+<script>
+  // --------------------------------------------------------------------------
+  // AirKorea API
+  // --------------------------------------------------------------------------
+  const STATION_URL =
+    "https://apis.data.go.kr/B552584/MsrstnInfoInqireSvc/getMsrstnList";
+
+  const REALTIME_URL =
+    "https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty";
+
+  // AirKorea 조회용 시도명.
+  const SIDOS = [
+    "서울", "부산", "대구", "인천", "광주", "대전", "울산",
+    "경기", "강원", "충북", "충남", "전북", "전남", "경북", "경남",
+    "제주", "세종"
+  ];
+
+  const map = L.map("map", { preferCanvas: true }).setView([36.35, 127.85], 7);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  let markers = [];
+  let currentData = [];
+
+  const pollutantSelect = document.getElementById("pollutant");
+  const serviceKeyInput = document.getElementById("serviceKey");
+  const loadBtn = document.getElementById("loadBtn");
+  const sampleBtn = document.getElementById("sampleBtn");
+
+  function setStatus(text) {
+    document.getElementById("status").textContent = text;
+  }
+
+  function showNotice(text, ms = 5000) {
+    const el = document.getElementById("notice");
+    el.textContent = text;
+    el.style.display = "block";
+    clearTimeout(showNotice.timer);
+    showNotice.timer = setTimeout(() => el.style.display = "none", ms);
+  }
+
+  function clearMarkers() {
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+  }
+
+  // 환경부 대기환경지수 구간과 비슷한 4단계 표시.
+  function gradeInfo(type, value) {
+    const v = Number(value);
+    if (!Number.isFinite(v)) {
+      return { name: "정보없음", color: "#9ca3af" };
+    }
+
+    if (type === "pm25") {
+      if (v <= 15) return { name: "좋음", color: "#2563eb" };
+      if (v <= 35) return { name: "보통", color: "#16a34a" };
+      if (v <= 75) return { name: "나쁨", color: "#f97316" };
+      return { name: "매우 나쁨", color: "#dc2626" };
+    }
+
+    if (v <= 30) return { name: "좋음", color: "#2563eb" };
+    if (v <= 80) return { name: "보통", color: "#16a34a" };
+    if (v <= 150) return { name: "나쁨", color: "#f97316" };
+    return { name: "매우 나쁨", color: "#dc2626" };
+  }
+
+  function asNumberOrNull(v) {
+    if (v === null || v === undefined || v === "" || v === "-") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function drawStations(data) {
+    clearMarkers();
+
+    const type = pollutantSelect.value;
+    const valueKey = type === "pm25" ? "pm25Value" : "pm10Value";
+    let validValueCount = 0;
+    const bounds = [];
+
+    data.forEach(item => {
+      const lat = asNumberOrNull(item.dmY);
+      const lng = asNumberOrNull(item.dmX);
+      if (lat === null || lng === null) return;
+
+      const value = asNumberOrNull(item[valueKey]);
+      if (value !== null) validValueCount++;
+
+      const grade = gradeInfo(type, value);
+
+      const marker = L.circleMarker([lat, lng], {
+        radius: 8,
+        color: "#ffffff",
+        weight: 2,
+        fillColor: grade.color,
+        fillOpacity: .92
+      });
+
+      const unit = "㎍/㎥";
+      const valueText = value === null ? "-" : `${value} ${unit}`;
+      const title = type === "pm25" ? "PM2.5" : "PM10";
+
+      marker.bindTooltip(
+        value === null ? "-" : String(value),
+        {
+          permanent: map.getZoom() >= 9,
+          direction: "center",
+          className: "station-label",
+          opacity: 1
+        }
+      );
+
+      marker.bindPopup(`
+        <div class="popup">
+          <h3>${escapeHtml(item.stationName || "측정소")}</h3>
+          <table>
+            <tr><td>시도</td><td>${escapeHtml(item.sidoName || "-")}</td></tr>
+            <tr><td>측정시각</td><td>${escapeHtml(item.dataTime || "-")}</td></tr>
+            <tr><td>${title}</td><td><b>${valueText}</b></td></tr>
+            <tr><td>등급</td><td><span class="badge" style="background:${grade.color}">${grade.name}</span></td></tr>
+            <tr><td>PM10</td><td>${item.pm10Value ?? "-"} ${item.pm10Value && item.pm10Value !== "-" ? unit : ""}</td></tr>
+            <tr><td>PM2.5</td><td>${item.pm25Value ?? "-"} ${item.pm25Value && item.pm25Value !== "-" ? unit : ""}</td></tr>
+            <tr><td>통합대기환경지수</td><td>${item.khaiValue ?? "-"}</td></tr>
+          </table>
+        </div>
+      `);
+
+      marker.addTo(map);
+      markers.push(marker);
+      bounds.push([lat, lng]);
+    });
+
+    document.getElementById("stationCount").textContent = markers.length;
+    document.getElementById("valueCount").textContent = validValueCount;
+
+    if (bounds.length) {
+      map.fitBounds(bounds, { padding: [25, 25], maxZoom: 8 });
+    }
+
+    updateTooltipMode();
+  }
+
+  function updateTooltipMode() {
+    const show = map.getZoom() >= 9;
+    markers.forEach(marker => {
+      const tt = marker.getTooltip();
+      if (!tt) return;
+      const wasOpen = marker.isTooltipOpen();
+      marker.unbindTooltip();
+
+      const item = marker.__data;
+      if (!item) return;
+      const type = pollutantSelect.value;
+      const valueKey = type === "pm25" ? "pm25Value" : "pm10Value";
+      const value = asNumberOrNull(item[valueKey]);
+
+      marker.bindTooltip(value === null ? "-" : String(value), {
+        permanent: show,
+        direction: "center",
+        className: "station-label",
+        opacity: 1
+      });
+      if (wasOpen && !show) marker.closeTooltip();
+    });
+  }
+
+  function renderCurrentData() {
+    clearMarkers();
+
+    const type = pollutantSelect.value;
+    const valueKey = type === "pm25" ? "pm25Value" : "pm10Value";
+    let validValueCount = 0;
+    const bounds = [];
+
+    currentData.forEach(item => {
+      const lat = asNumberOrNull(item.dmY);
+      const lng = asNumberOrNull(item.dmX);
+      if (lat === null || lng === null) return;
+
+      const value = asNumberOrNull(item[valueKey]);
+      if (value !== null) validValueCount++;
+      const grade = gradeInfo(type, value);
+
+      const marker = L.circleMarker([lat, lng], {
+        radius: 9,
+        color: "#fff",
+        weight: 2,
+        fillColor: grade.color,
+        fillOpacity: .9
+      });
+
+      marker.__data = item;
+
+      marker.bindTooltip(value === null ? "-" : String(value), {
+        permanent: map.getZoom() >= 9,
+        direction: "center",
+        className: "station-label",
+        opacity: 1
+      });
+
+      const unit = "㎍/㎥";
+      marker.bindPopup(`
+        <div class="popup">
+          <h3>${escapeHtml(item.stationName || "측정소")}</h3>
+          <table>
+            <tr><td>시도</td><td>${escapeHtml(item.sidoName || "-")}</td></tr>
+            <tr><td>측정시각</td><td>${escapeHtml(item.dataTime || "-")}</td></tr>
+            <tr><td>PM10</td><td><b>${item.pm10Value ?? "-"}</b> ${item.pm10Value && item.pm10Value !== "-" ? unit : ""}</td></tr>
+            <tr><td>PM2.5</td><td><b>${item.pm25Value ?? "-"}</b> ${item.pm25Value && item.pm25Value !== "-" ? unit : ""}</td></tr>
+            <tr><td>현재 표시 등급</td><td><span class="badge" style="background:${grade.color}">${grade.name}</span></td></tr>
+            <tr><td>통합대기환경지수</td><td>${item.khaiValue ?? "-"}</td></tr>
+          </table>
+        </div>
+      `);
+
+      marker.addTo(map);
+      markers.push(marker);
+      bounds.push([lat, lng]);
+    });
+
+    document.getElementById("stationCount").textContent = markers.length;
+    document.getElementById("valueCount").textContent = validValueCount;
+
+    if (bounds.length && currentData.length > 10) {
+      map.fitBounds(bounds, { padding: [25, 25], maxZoom: 8 });
+    }
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  async function apiGet(baseUrl, params) {
+    const url = new URL(baseUrl);
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+
+    const header = json?.response?.header;
+    if (header && String(header.resultCode) !== "00") {
+      throw new Error(`${header.resultCode}: ${header.resultMsg || "API 오류"}`);
+    }
+    return json?.response?.body?.items || [];
+  }
+
+  async function loadNationwide() {
+    const key = serviceKeyInput.value.trim();
+    if (!key) {
+      showNotice("공공데이터포털에서 발급받은 AirKorea API 일반 인증키를 입력해주세요.");
+      return;
+    }
+
+    loadBtn.disabled = true;
+    currentData = [];
+    clearMarkers();
+    setStatus("전국 측정소와 실시간 값을 조회하는 중...");
+
+    try {
+      const all = [];
+
+      // 시도별 조회를 순차 수행해 순간 호출량을 낮춤.
+      for (let i = 0; i < SIDOS.length; i++) {
+        const sido = SIDOS[i];
+        setStatus(`[${i + 1}/${SIDOS.length}] ${sido} 측정소 위치 조회 중...`);
+
+        const stationItems = await apiGet(STATION_URL, {
+          serviceKey: key,
+          returnType: "json",
+          numOfRows: "1000",
+          pageNo: "1",
+          addr: sido
+        });
+
+        setStatus(`[${i + 1}/${SIDOS.length}] ${sido} 실시간 측정값 조회 중...`);
+
+        const measureItems = await apiGet(REALTIME_URL, {
+          serviceKey: key,
+          returnType: "json",
+          numOfRows: "1000",
+          pageNo: "1",
+          sidoName: sido,
+          ver: "1.3"
+        });
+
+        // 같은 시도 + 측정소명 기준으로 좌표와 측정값 병합
+        const positionMap = new Map(
+          stationItems.map(s => [String(s.stationName || "").trim(), s])
+        );
+
+        measureItems.forEach(m => {
+          const pos = positionMap.get(String(m.stationName || "").trim());
+          if (!pos) return;
+
+          all.push({
+            ...m,
+            dmX: pos.dmX,
+            dmY: pos.dmY,
+            addr: pos.addr
+          });
+        });
+
+        // API 부담 완화
+        await new Promise(r => setTimeout(r, 80));
+      }
+
+      currentData = all;
+      renderCurrentData();
+      setStatus(`조회 완료 · ${new Date().toLocaleString("ko-KR")}`);
+
+      if (!all.length) {
+        throw new Error("좌표와 측정값을 결합한 결과가 없습니다.");
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus("API 조회 실패");
+      showNotice(
+        `AirKorea API 호출에 실패했습니다: ${err.message}. ` +
+        `인증키, OpenAPI 활용신청/승인 상태, 브라우저 CORS 정책을 확인해주세요.`,
+        9000
+      );
+    } finally {
+      loadBtn.disabled = false;
+    }
+  }
+
+  const sampleData = [
+    { stationName:"종로구", sidoName:"서울", dmY:37.5720, dmX:127.0050, pm10Value:"29", pm25Value:"14", khaiValue:"48", dataTime:"샘플" },
+    { stationName:"강남구", sidoName:"서울", dmY:37.5172, dmX:127.0473, pm10Value:"58", pm25Value:"26", khaiValue:"67", dataTime:"샘플" },
+    { stationName:"수원", sidoName:"경기", dmY:37.2636, dmX:127.0286, pm10Value:"92", pm25Value:"41", khaiValue:"89", dataTime:"샘플" },
+    { stationName:"춘천", sidoName:"강원", dmY:37.8813, dmX:127.7298, pm10Value:"24", pm25Value:"12", khaiValue:"42", dataTime:"샘플" },
+    { stationName:"대전", sidoName:"대전", dmY:36.3504, dmX:127.3845, pm10Value:"44", pm25Value:"22", khaiValue:"57", dataTime:"샘플" },
+    { stationName:"청주", sidoName:"충북", dmY:36.6424, dmX:127.4890, pm10Value:"71", pm25Value:"38", khaiValue:"78", dataTime:"샘플" },
+    { stationName:"전주", sidoName:"전북", dmY:35.8242, dmX:127.1480, pm10Value:"32", pm25Value:"17", khaiValue:"52", dataTime:"샘플" },
+    { stationName:"광주", sidoName:"광주", dmY:35.1595, dmX:126.8526, pm10Value:"18", pm25Value:"9", khaiValue:"36", dataTime:"샘플" },
+    { stationName:"대구", sidoName:"대구", dmY:35.8714, dmX:128.6014, pm10Value:"83", pm25Value:"43", khaiValue:"86", dataTime:"샘플" },
+    { stationName:"울산", sidoName:"울산", dmY:35.5384, dmX:129.3114, pm10Value:"153", pm25Value:"79", khaiValue:"132", dataTime:"샘플" },
+    { stationName:"부산", sidoName:"부산", dmY:35.1796, dmX:129.0756, pm10Value:"47", pm25Value:"21", khaiValue:"59", dataTime:"샘플" },
+    { stationName:"제주", sidoName:"제주", dmY:33.4996, dmX:126.5312, pm10Value:"21", pm25Value:"10", khaiValue:"39", dataTime:"샘플" }
+  ];
+
+  loadBtn.addEventListener("click", loadNationwide);
+
+  sampleBtn.addEventListener("click", () => {
+    currentData = sampleData;
+    renderCurrentData();
+    setStatus("샘플 데이터 표시 중 · 실제 측정값이 아닙니다.");
+  });
+
+  pollutantSelect.addEventListener("change", () => {
+    if (currentData.length) renderCurrentData();
+    updateLegend();
+  });
+
+  map.on("zoomend", updateTooltipMode);
+
+  // 범례
+  const legend = L.control({ position: "bottomright" });
+  legend.onAdd = function() {
+    const div = L.DomUtil.create("div", "legend");
+    div.id = "legend";
+    return div;
+  };
+  legend.addTo(map);
+
+  function updateLegend() {
+    const type = pollutantSelect.value;
+    const rows = type === "pm25"
+      ? [
+          ["#2563eb", "좋음", "0~15"],
+          ["#16a34a", "보통", "16~35"],
+          ["#f97316", "나쁨", "36~75"],
+          ["#dc2626", "매우 나쁨", "76 이상"]
+        ]
+      : [
+          ["#2563eb", "좋음", "0~30"],
+          ["#16a34a", "보통", "31~80"],
+          ["#f97316", "나쁨", "81~150"],
+          ["#dc2626", "매우 나쁨", "151 이상"]
+        ];
+
+    document.getElementById("legend").innerHTML = `
+      <b>${type === "pm25" ? "PM2.5" : "PM10"} (㎍/㎥)</b>
+      ${rows.map(r => `
+        <div class="legend-row">
+          <span class="dot" style="background:${r[0]}"></span>
+          <span>${r[1]} · ${r[2]}</span>
+        </div>`).join("")}
+      <div class="legend-row">
+        <span class="dot" style="background:#9ca3af"></span>
+        <span>정보없음</span>
+      </div>
+    `;
+  }
+
+  updateLegend();
+</script>
+</body>
+</html>
