@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>지형 뷰어 — WebGL</title>
+<style>
+  :root {
+    --terrain-void   : #09100e;
+    --panel-fill     : rgba(12, 18, 16, 0.82);
+    --panel-edge     : rgba(216, 255, 85, 0.16);
+    --accent         : #d8ff55;
+    --paper          : #e8eadf;
+    --muted          : #939b91;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--terrain-void);
+    color: var(--paper);
+    font-family: "Consolas", "D2Coding", "Menlo", ui-monospace, monospace;
+    overflow: hidden;
+  }
+
+  canvas { display: block; touch-action: none; }
+
+  #hud {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    padding: 28px;
+    display: grid;
+    grid-template-columns: 290px 1fr 330px;
+    grid-template-rows: auto 1fr auto;
+    gap: 16px;
+  }
+
+  .panel {
+    background: var(--panel-fill);
+    border: 1px solid var(--panel-edge);
+    padding: 16px 18px;
+    line-height: 1.9;
+    font-size: 13px;
+    backdrop-filter: blur(2px);
+  }
+
+  .panel h1 {
+    margin: 2px 0 6px;
+    font-size: 30px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    color: var(--paper);
+  }
+
+  .tag    { color: var(--accent); font-size: 12px; letter-spacing: 0.14em; }
+  .muted  { color: var(--muted); }
+  .row    { display: flex; justify-content: space-between; align-items: center; gap: 12px; white-space: nowrap; }
+  .row b  { font-weight: 400; color: var(--paper); display: flex; align-items: center; gap: 6px; }
+  .key    { color: var(--accent); font-size: 12px; }
+
+  .row.tap {
+    pointer-events: auto;
+    cursor: pointer;
+    width: 100%;
+    padding: 2px 0;
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    text-align: left;
+  }
+  .row.tap:hover span:first-child { color: var(--accent); }
+  .row.tap:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+  .row.tap.armed span:first-child { color: var(--accent); }
+
+  .step {
+    pointer-events: auto;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    line-height: 1;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    color: var(--accent);
+    background: transparent;
+    border: 1px solid var(--panel-edge);
+  }
+  .step:hover { border-color: var(--accent); }
+  .step:focus-visible { outline: 1px solid var(--paper); outline-offset: 2px; }
+
+  .divider { height: 1px; background: var(--panel-edge); margin: 8px 0; }
+
+  .action-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .action {
+    pointer-events: auto;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    padding: 5px 10px;
+    color: var(--accent);
+    background: transparent;
+    border: 1px solid var(--panel-edge);
+  }
+  .action:hover { border-color: var(--accent); }
+  .action.armed { background: var(--accent); color: var(--terrain-void); }
+  .action:focus-visible { outline: 1px solid var(--paper); outline-offset: 2px; }
+
+  #readout { margin-bottom: 6px; }
+  #readout .row b { color: var(--accent); }
+
+  #section-chart { display: none; margin-top: 10px; }
+  #section-chart.visible { display: block; }
+  #section-chart svg { width: 100%; height: auto; display: block; }
+
+  #title-panel   { grid-column: 1; grid-row: 1; align-self: start; }
+  #control-panel { grid-column: 3; grid-row: 1; align-self: start; }
+  #profile-panel { grid-column: 1; grid-row: 3; align-self: end; }
+  #navigate-panel{ grid-column: 3; grid-row: 3; align-self: end; }
+
+  #status {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: center;
+    align-self: end;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  #status.hint { color: var(--accent); }
+
+  #loader {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 18px;
+    background: var(--terrain-void);
+    text-align: center;
+    padding: 24px;
+  }
+
+  #loader.hidden { display: none; }
+
+  #loader p { max-width: 46ch; color: var(--muted); font-size: 13px; line-height: 1.8; margin: 0; }
+
+  #loader h2 { font-weight: 400; font-size: 22px; letter-spacing: 0.05em; margin: 0; }
+
+  .button {
+    pointer-events: auto;
+    font: inherit;
+    font-size: 13px;
+    color: var(--terrain-void);
+    background: var(--accent);
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+  }
+
+  .button.ghost {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--panel-edge);
+  }
+
+  .button:focus-visible { outline: 2px solid var(--paper); outline-offset: 3px; }
+
+  #drop-hint { font-size: 12px; color: var(--muted); }
+
+  @media (max-width: 900px) {
+    #hud { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; padding: 12px; gap: 10px; }
+    #title-panel, #control-panel, #profile-panel { grid-column: 1; }
+    #title-panel { grid-row: 1; padding: 10px 14px; }
+    #title-panel h1 { font-size: 21px; margin: 0; }
+    #title-panel .muted { display: none; }
+    #control-panel {
+      grid-row: 2;
+      align-self: start;
+      max-height: 44vh;
+      overflow-y: auto;
+      pointer-events: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    #profile-panel { grid-row: 3; align-self: end; }
+    #navigate-panel, #status { display: none; }
+    .key { display: none; }
+    .step { width: 30px; height: 30px; }
+    .row.tap { padding: 5px 0; }
+    .panel { line-height: 2.1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<div id="hud" hidden>
+  <section class="panel" id="title-panel">
+    <div class="tag" id="value-bounds">— / —</div>
+    <h1 id="value-title">지형 뷰어</h1>
+    <div class="muted">Three.js + WebGL</div>
+  </section>
+
+  <section class="panel" id="control-panel">
+    <div class="tag">지형 조절</div>
+
+    <div class="row">
+      <span>수직 과장</span>
+      <b>
+        <button class="step" data-action="exaggeration-down" aria-label="수직 과장 줄이기">−</button>
+        <span id="value-scale">4.0</span>배
+        <button class="step" data-action="exaggeration-up" aria-label="수직 과장 늘리기">+</button>
+        <span class="key">↑ ↓</span>
+      </b>
+    </div>
+
+    <button class="row tap" data-action="contour">
+      <span>등고선</span>
+      <b><span id="value-contour">켜짐</span> <span class="key">C</span></b>
+    </button>
+
+    <button class="row tap" data-action="interval">
+      <span>등고선 간격</span>
+      <b><span id="value-interval">50</span> m <span class="key">1 2 3</span></b>
+    </button>
+
+    <button class="row tap" data-action="color-mode">
+      <span>색상</span>
+      <b><span id="value-color">고도</span> <span class="key">M</span></b>
+    </button>
+
+    <div class="divider"></div>
+
+    <div class="row">
+      <span>수면 높이</span>
+      <b>
+        <button class="step" data-action="water-down" aria-label="수면 낮추기">−</button>
+        <span id="value-water">꺼짐</span>
+        <button class="step" data-action="water-up" aria-label="수면 높이기">+</button>
+        <span class="key">0 − =</span>
+      </b>
+    </div>
+
+    <div class="row">
+      <span>햇빛 방향</span>
+      <b>
+        <button class="step" data-action="sun-left" aria-label="햇빛 왼쪽으로">‹</button>
+        <span id="value-sun">315</span>°
+        <button class="step" data-action="sun-right" aria-label="햇빛 오른쪽으로">›</button>
+        <span class="key">[ ]</span>
+      </b>
+    </div>
+
+    <button class="row tap" data-action="labels">
+      <span>봉우리 이름</span>
+      <b><span id="value-labels">켜짐</span> <span class="key">L</span></b>
+    </button>
+
+    <button class="row tap" data-action="wireframe">
+      <span>격자선</span>
+      <b><span id="value-wireframe">꺼짐</span> <span class="key">W</span></b>
+    </button>
+
+    <div class="action-list">
+      <button class="action" data-action="section" id="section-button">단면 그리기</button>
+      <button class="action" data-action="top">하늘에서 보기</button>
+      <button class="action" data-action="reset">시점 되돌리기</button>
+      <button class="action" data-action="capture">화면 저장</button>
+    </div>
+  </section>
+
+  <section class="panel" id="profile-panel">
+    <div class="tag">데이터</div>
+    <div id="readout">
+      <div class="row"><span>커서 고도</span><b id="value-cursor">—</b></div>
+      <div class="row"><span>커서 좌표</span><b id="value-cursor-coordinate">—</b></div>
+    </div>
+    <div class="row"><span>고도 범위</span><b id="value-elevation">—</b></div>
+    <div class="row"><span>격자</span><b id="value-grid">—</b></div>
+    <div class="row"><span>좌표계</span><b>WGS 84</b></div>
+    <div class="row muted"><span>출처</span><b id="value-source">—</b></div>
+    <div id="section-chart"></div>
+  </section>
+
+  <section class="panel" id="navigate-panel">
+    <div class="tag">시점 이동</div>
+    <div class="muted">왼쪽 끌기 회전 · 오른쪽 끌기 이동</div>
+    <div class="muted">휠 확대 · 축소</div>
+    <div class="muted">터치: 한 손가락 회전, 두 손가락 이동</div>
+    <div class="muted">지형 위에 커서를 두면 고도가 표시됩니다</div>
+    <div class="row"><span class="muted">키 안내</span><b class="key">R T P S</b></div>
+  </section>
+
+  <div id="status">— × — · — fps</div>
+</div>
+
+<div id="loader">
+  <h2>고도 데이터를 불러오세요</h2>
+  <p>대한민국 전국 고도 데이터를 자동으로 내려받습니다. 자동 로드가 막히면 아래 버튼으로 다시 받거나, JSON 파일을 직접 골라 이 화면에 끌어다 놓으세요.</p>
+  <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;">
+    <button class="button" id="load-korea-button">전국 지형 불러오기</button>
+    <button class="button ghost" id="pick-button">JSON 파일 고르기</button>
+    <button class="button ghost" id="sample-button">예시 형상 보기</button>
+  </div>
+  <div id="drop-hint">전국 데이터 출처: Mapzen Terrain Tiles · 예시 형상은 뷰어 확인용으로 만들어 낸 가상 지형입니다.</div>
+  <input type="file" id="file-input" accept=".json,application/json" hidden>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+////////////////////////////////////////////////////
+// 서울 3차원 지형 뷰어 (WebGL)
+// pygame + PyOpenGL 판과 같은 데이터, 같은 배색, 같은 조작을 브라우저에서 재현한다.
+// 수직 과장은 그룹 scale.y 로 처리하므로 형상은 한 번만 만든다.
+////////////////////////////////////////////////////
+
+const BACKGROUND_COLOR     = 0x09100e;
+const BASE_ELEVATION_SCALE = 0.001;
+const BASE_THICKNESS       = 0.65;
+const SUN_ALTITUDE_RADIAN  = 0.92;
+const SECTION_SAMPLE_COUNT = 160;
+const COLOR_STOP_LIST = [
+  [0,   [0.090, 0.247, 0.224]],
+  [50,  [0.184, 0.400, 0.314]],
+  [150, [0.427, 0.533, 0.325]],
+  [300, [0.643, 0.569, 0.361]],
+  [500, [0.612, 0.447, 0.325]],
+  [850, [0.851, 0.831, 0.741]]
+];
+
+// 실제 좌표. 격자 밖으로 벗어나는 봉우리는 자동으로 걸러진다.
+// maxSpanKm: 지도 폭이 이 값 이하일 때만 이름을 띄운다. 즉 값이 클수록 넓은 지도에서도 보인다.
+// Infinity 인 명산은 전국 지도에서도 늘 표시하고, 작은 값의 근교 산은 확대해야 나온다.
+const PEAK_LIST = [
+  // 전국 명산 — 어느 축척에서도 표시
+  { name : "한라산", longitude : 126.5292, latitude : 33.3617, maxSpanKm : Infinity },
+  { name : "지리산", longitude : 127.7306, latitude : 35.3372, maxSpanKm : Infinity },
+  { name : "설악산", longitude : 128.4655, latitude : 38.1197, maxSpanKm : Infinity },
+  { name : "덕유산", longitude : 127.7458, latitude : 35.8603, maxSpanKm : Infinity },
+  { name : "태백산", longitude : 128.9156, latitude : 37.0964, maxSpanKm : Infinity },
+  { name : "오대산", longitude : 128.5433, latitude : 37.7936, maxSpanKm : Infinity },
+  { name : "소백산", longitude : 128.4856, latitude : 36.9564, maxSpanKm : Infinity },
+  { name : "가야산", longitude : 128.1214, latitude : 35.8214, maxSpanKm : Infinity },
+  // 광역권 명산 — 폭 300km 이하에서 표시(전국 지도에서는 생략)
+  { name : "속리산", longitude : 127.8703, latitude : 36.5439, maxSpanKm : 300 },
+  { name : "팔공산", longitude : 128.6947, latitude : 36.0119, maxSpanKm : 300 },
+  { name : "무등산", longitude : 126.9886, latitude : 35.1342, maxSpanKm : 300 },
+  { name : "계룡산", longitude : 127.2075, latitude : 36.3419, maxSpanKm : 300 },
+  { name : "월출산", longitude : 126.7050, latitude : 34.7669, maxSpanKm : 300 },
+  { name : "내장산", longitude : 126.8892, latitude : 35.4936, maxSpanKm : 300 },
+  { name : "북한산", longitude : 126.9880, latitude : 37.6592, maxSpanKm : 300 },
+  { name : "관악산", longitude : 126.9640, latitude : 37.4450, maxSpanKm : 300 },
+  // 서울·수도권 근교 — 폭 60km 이하로 확대했을 때만 표시
+  { name : "도봉산", longitude : 127.0148, latitude : 37.6903, maxSpanKm : 60 },
+  { name : "수락산", longitude : 127.0620, latitude : 37.6890, maxSpanKm : 60 },
+  { name : "불암산", longitude : 127.0900, latitude : 37.6470, maxSpanKm : 60 },
+  { name : "인왕산", longitude : 126.9585, latitude : 37.5800, maxSpanKm : 60 },
+  { name : "남산",   longitude : 126.9882, latitude : 37.5512, maxSpanKm : 60 },
+  { name : "아차산", longitude : 127.1000, latitude : 37.5560, maxSpanKm : 60 },
+  { name : "청계산", longitude : 127.0350, latitude : 37.4180, maxSpanKm : 60 }
+];
+
+const COLOR_MODE_LIST  = ["elevation", "slope", "mono"];
+const COLOR_MODE_LABEL = { elevation : "고도", slope : "경사", mono : "회색" };
+
+const state = {
+  terrainData         : null,
+  terrainWidth        : 0,
+  terrainDepth        : 0,
+  positionXList       : [],
+  positionZList       : [],
+  isLatitudeDescending: true,
+  contourInterval     : 50,
+  contourVisible      : true,
+  exaggeration        : 4.0,
+  colorMode           : "elevation",
+  waterLevelMeter     : null,
+  sunAzimuthDegree    : 315,
+  labelsVisible       : true,
+  wireframeVisible    : false,
+  sectionMode         : false,
+  sectionStartPoint   : null,
+  sectionSampleList   : null,
+  contourGroup        : null,
+  terrainMesh         : null,
+  baseMesh            : null,
+  waterMesh           : null,
+  labelGroup          : null,
+  sectionLine         : null,
+  cursorMarker        : null,
+  minimumElevation    : 0,
+  maximumElevation    : 0,
+  renderLoopStarted   : false,
+  pendingPointer      : null,
+  restoredCamera      : null,
+  frameCount          : 0,
+  frameTimestamp      : performance.now()
+};
+
+const loaderElement = document.getElementById("loader");
+const hudElement    = document.getElementById("hud");
+const statusElement = document.getElementById("status");
+
+const renderer = new THREE.WebGLRenderer({ antialias : true, preserveDrawingBuffer : true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(BACKGROUND_COLOR);
+scene.fog        = new THREE.FogExp2(BACKGROUND_COLOR, 0.018);
+
+const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 400);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping  = true;
+controls.dampingFactor  = 0.08;
+controls.minDistance    = 8;
+controls.maxDistance    = 110;
+controls.maxPolarAngle  = Math.PI / 2 - 0.1;
+controls.mouseButtons   = {
+  LEFT   : THREE.MOUSE.ROTATE,
+  MIDDLE : THREE.MOUSE.DOLLY,
+  RIGHT  : THREE.MOUSE.PAN
+};
+
+scene.add(new THREE.AmbientLight(0x8fa090, 1.15));
+const sunLight = new THREE.DirectionalLight(0xfff2d1, 1.35);
+scene.add(sunLight);
+
+const terrainGroup = new THREE.Group();
+scene.add(terrainGroup);
+
+const raycaster    = new THREE.Raycaster();
+const pointerVector = new THREE.Vector2();
+
+function clampValue(value, minimum, maximum) {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+function getTerrainColor(elevationMeter) {
+  for (let stopIndex = 1; stopIndex < COLOR_STOP_LIST.length; stopIndex += 1) {
+    const [currentHeight,  currentColor ] = COLOR_STOP_LIST[stopIndex];
+    const [previousHeight, previousColor] = COLOR_STOP_LIST[stopIndex - 1];
+    if (elevationMeter <= currentHeight) {
+      const ratio = Math.max(0, (elevationMeter - previousHeight) / (currentHeight - previousHeight));
+      return previousColor.map((channel, index) => channel + (currentColor[index] - channel) * ratio);
+    }
+  }
+  return COLOR_STOP_LIST[COLOR_STOP_LIST.length - 1][1];
+}
+
+function buildTerrainMesh() {
+  const grid        = state.terrainData.grid;
+  const columnCount = grid.column_count;
+  const rowCount    = grid.row_count;
+  const elevations  = grid.elevation_list;
+  const vertexCount = columnCount * rowCount;
+  const positions   = new Float32Array(vertexCount * 3);
+  const colors      = new Float32Array(vertexCount * 3);
+
+  for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+    for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
+      const pointIndex     = rowIndex * columnCount + columnIndex;
+      const elevationMeter = elevations[pointIndex];
+      positions[pointIndex * 3    ] = state.positionXList[columnIndex];
+      positions[pointIndex * 3 + 1] = elevationMeter * BASE_ELEVATION_SCALE;
+      positions[pointIndex * 3 + 2] = state.positionZList[rowIndex];
+    }
+  }
+
+  const indices = [];
+  for (let rowIndex = 0; rowIndex < rowCount - 1; rowIndex += 1) {
+    for (let columnIndex = 0; columnIndex < columnCount - 1; columnIndex += 1) {
+      const topLeft     = rowIndex * columnCount + columnIndex;
+      const topRight    = topLeft + 1;
+      const bottomLeft  = topLeft + columnCount;
+      const bottomRight = bottomLeft + 1;
+      indices.push(topLeft, bottomLeft, topRight, topRight, bottomLeft, bottomRight);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("color",    new THREE.BufferAttribute(colors,    3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshLambertMaterial({
+    vertexColors        : true,
+    polygonOffset       : true,
+    polygonOffsetFactor : 1,
+    polygonOffsetUnits  : 1
+  });
+
+  return new THREE.Mesh(geometry, material);
+}
+
+// 색상 배열만 다시 채운다. 지오메트리는 그대로 둔다.
+function applyColorMode() {
+  const grid        = state.terrainData.grid;
+  const elevations  = grid.elevation_list;
+  const colorAttribute  = state.terrainMesh.geometry.getAttribute("color");
+  const normalAttribute = state.terrainMesh.geometry.getAttribute("normal");
+  const workColor   = new THREE.Color();
+  const range       = Math.max(1, state.maximumElevation - state.minimumElevation);
+
+  for (let pointIndex = 0; pointIndex < elevations.length; pointIndex += 1) {
+    let red, green, blue;
+
+    if (state.colorMode === "elevation") {
+      [red, green, blue] = getTerrainColor(elevations[pointIndex]);
+    } else if (state.colorMode === "slope") {
+      // 법선은 1:1 축척 형상에서 계산되므로 여기 경사는 실제 경사각이다.
+      const slopeRatio = clampValue(Math.acos(clampValue(normalAttribute.getY(pointIndex), -1, 1)) / (Math.PI / 3), 0, 1);
+      red   = 0.10 + 0.75 * slopeRatio;
+      green = 0.30 + 0.62 * slopeRatio;
+      blue  = 0.26 - 0.10 * slopeRatio;
+    } else {
+      const level = 0.16 + 0.74 * ((elevations[pointIndex] - state.minimumElevation) / range);
+      red = green = blue = level;
+    }
+
+    workColor.setRGB(red, green, blue, THREE.SRGBColorSpace);
+    colorAttribute.setXYZ(pointIndex, workColor.r, workColor.g, workColor.b);
+  }
+
+  colorAttribute.needsUpdate = true;
+}
+
+function addContourSegment(vertexList, intersectionList, firstIndex, secondIndex) {
+  vertexList.push(...intersectionList[firstIndex], ...intersectionList[secondIndex]);
+}
+
+function getContourIntersection(pointA, pointB, levelMeter) {
+  const ratio = (levelMeter - pointA[1]) / (pointB[1] - pointA[1]);
+  return [
+    pointA[0] + (pointB[0] - pointA[0]) * ratio,
+    levelMeter * BASE_ELEVATION_SCALE,
+    pointA[2] + (pointB[2] - pointA[2]) * ratio
+  ];
+}
+
+// 마칭 스퀘어. 셀마다 교차 가능한 등고 레벨 구간만 훑는다.
+// 다섯 번째 선마다 계곡선으로 따로 담아 굵고 밝게 그린다.
+function buildContourGroup(intervalMeter) {
+  const grid          = state.terrainData.grid;
+  const columnCount   = grid.column_count;
+  const rowCount      = grid.row_count;
+  const elevations    = grid.elevation_list;
+  const edgeIndexList = [[0, 1], [1, 2], [2, 3], [3, 0]];
+  const minorVertexList = [];
+  const majorVertexList = [];
+
+  for (let rowIndex = 0; rowIndex < rowCount - 1; rowIndex += 1) {
+    const upperOffset = rowIndex * columnCount;
+    const lowerOffset = upperOffset + columnCount;
+    for (let columnIndex = 0; columnIndex < columnCount - 1; columnIndex += 1) {
+      const topLeftMeter     = elevations[upperOffset + columnIndex];
+      const topRightMeter    = elevations[upperOffset + columnIndex + 1];
+      const bottomRightMeter = elevations[lowerOffset + columnIndex + 1];
+      const bottomLeftMeter  = elevations[lowerOffset + columnIndex];
+      const minimumMeter     = Math.min(topLeftMeter, topRightMeter, bottomRightMeter, bottomLeftMeter);
+      const maximumMeter     = Math.max(topLeftMeter, topRightMeter, bottomRightMeter, bottomLeftMeter);
+      const firstLevelMeter  = (Math.floor(minimumMeter / intervalMeter) + 1) * intervalMeter;
+      if (firstLevelMeter > maximumMeter) continue;
+
+      const leftX  = state.positionXList[columnIndex];
+      const rightX = state.positionXList[columnIndex + 1];
+      const upperZ = state.positionZList[rowIndex];
+      const lowerZ = state.positionZList[rowIndex + 1];
+      const pointList = [
+        [leftX,  topLeftMeter,     upperZ],
+        [rightX, topRightMeter,    upperZ],
+        [rightX, bottomRightMeter, lowerZ],
+        [leftX,  bottomLeftMeter,  lowerZ]
+      ];
+
+      for (let levelMeter = firstLevelMeter; levelMeter <= maximumMeter; levelMeter += intervalMeter) {
+        const intersectionList = [];
+        for (const [firstIndex, secondIndex] of edgeIndexList) {
+          const pointA = pointList[firstIndex];
+          const pointB = pointList[secondIndex];
+          const isCrossed = (pointA[1] < levelMeter && levelMeter <= pointB[1]) ||
+                            (pointB[1] < levelMeter && levelMeter <= pointA[1]);
+          if (isCrossed) intersectionList.push(getContourIntersection(pointA, pointB, levelMeter));
+        }
+
+        const isMajorLevel = Math.round(levelMeter / intervalMeter) % 5 === 0;
+        const vertexList   = isMajorLevel ? majorVertexList : minorVertexList;
+
+        if (intersectionList.length === 2) {
+          addContourSegment(vertexList, intersectionList, 0, 1);
+        } else if (intersectionList.length === 4) {
+          const centerMeter = (topLeftMeter + topRightMeter + bottomRightMeter + bottomLeftMeter) / 4;
+          if (centerMeter >= levelMeter) {
+            addContourSegment(vertexList, intersectionList, 0, 1);
+            addContourSegment(vertexList, intersectionList, 2, 3);
+          } else {
+            addContourSegment(vertexList, intersectionList, 0, 3);
+            addContourSegment(vertexList, intersectionList, 1, 2);
+          }
+        }
+      }
+    }
+  }
+
+  const group = new THREE.Group();
+  group.add(buildLineSegments(minorVertexList, 0x101512, 0.62));
+  group.add(buildLineSegments(majorVertexList, 0x3d4a3a, 0.95));
+  return group;
+}
+
+function buildLineSegments(vertexList, colorValue, opacityValue) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertexList, 3));
+  const material = new THREE.LineBasicMaterial({ color : colorValue, transparent : true, opacity : opacityValue });
+  return new THREE.LineSegments(geometry, material);
+}
+
+function buildTerrainBase() {
+  const geometry = new THREE.BoxGeometry(state.terrainWidth, BASE_THICKNESS, state.terrainDepth);
+  const material = new THREE.MeshLambertMaterial({ color : 0x101b17 });
+  return new THREE.Mesh(geometry, material);
+}
+
+function buildWaterMesh() {
+  const geometry = new THREE.PlaneGeometry(state.terrainWidth, state.terrainDepth);
+  const material = new THREE.MeshBasicMaterial({
+    color       : 0x16414a,
+    transparent : true,
+    opacity     : 0.62,
+    depthWrite  : false
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.visible    = false;
+  return mesh;
+}
+
+function buildCursorMarker() {
+  const geometry = new THREE.RingGeometry(0.22, 0.34, 24);
+  const material = new THREE.MeshBasicMaterial({ color : 0xd8ff55, transparent : true, opacity : 0.85, depthTest : false });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.rotation.x  = -Math.PI / 2;
+  mesh.renderOrder = 2;
+  mesh.visible     = false;
+  return mesh;
+}
+
+// 지오메트리와 재질을 함께 반납한다. 파일을 다시 열 때 메모리가 새지 않도록.
+function disposeObject(parent, object) {
+  if (!object) return;
+  parent.remove(object);
+  object.traverse((child) => {
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) {
+      if (child.material.map) child.material.map.dispose();
+      child.material.dispose();
+    }
+  });
+}
+
+// 수직 과장은 그룹 스케일로 처리하고, 그룹 밖 물체는 높이만 맞춘다.
+function applyExaggeration() {
+  terrainGroup.scale.y = state.exaggeration;
+
+  if (state.baseMesh) {
+    const groundY = state.minimumElevation * BASE_ELEVATION_SCALE * state.exaggeration;
+    state.baseMesh.position.y = groundY + 0.02 - BASE_THICKNESS / 2;
+  }
+  if (state.waterMesh && state.waterLevelMeter !== null) {
+    state.waterMesh.position.y = state.waterLevelMeter * BASE_ELEVATION_SCALE * state.exaggeration;
+  }
+  if (state.labelGroup) {
+    for (const sprite of state.labelGroup.children) {
+      sprite.position.y = sprite.userData.elevationMeter * BASE_ELEVATION_SCALE * state.exaggeration + 0.9;
+    }
+  }
+  rebuildSectionLine();
+}
+
+function applySunDirection() {
+  const azimuthRadian = state.sunAzimuthDegree * Math.PI / 180;
+  const distance      = Math.max(state.terrainWidth, state.terrainDepth, 40);
+  sunLight.position.set(
+    distance * Math.cos(SUN_ALTITUDE_RADIAN) * Math.sin(azimuthRadian),
+    distance * Math.sin(SUN_ALTITUDE_RADIAN),
+    distance * Math.cos(SUN_ALTITUDE_RADIAN) * Math.cos(azimuthRadian)
+  );
+}
+
+function rebuildContour() {
+  disposeObject(terrainGroup, state.contourGroup);
+  state.contourGroup         = buildContourGroup(state.contourInterval);
+  state.contourGroup.visible = state.contourVisible;
+  terrainGroup.add(state.contourGroup);
+}
+
+////////////////////////////////////////////////////
+// 격자 조회
+////////////////////////////////////////////////////
+
+function getRowRatio(worldZ) {
+  const ratio = (worldZ + state.terrainDepth / 2) / state.terrainDepth;
+  return state.isLatitudeDescending ? ratio : 1 - ratio;
+}
+
+// 화면에 읽어 줄 값은 보간하지 않고 가장 가까운 격자점을 그대로 쓴다.
+function getGridSample(worldX, worldZ) {
+  const grid        = state.terrainData.grid;
+  const columnIndex = clampValue(Math.round((worldX + state.terrainWidth / 2) / state.terrainWidth * (grid.column_count - 1)), 0, grid.column_count - 1);
+  const rowIndex    = clampValue(Math.round(getRowRatio(worldZ) * (grid.row_count - 1)), 0, grid.row_count - 1);
+  return {
+    columnIndex,
+    rowIndex,
+    elevationMeter : grid.elevation_list[rowIndex * grid.column_count + columnIndex],
+    longitude      : grid.longitude_list[columnIndex],
+    latitude       : grid.latitude_list[rowIndex]
+  };
+}
+
+// 단면은 격자 사이를 지나므로 겹선형 보간을 쓴다.
+function sampleElevation(worldX, worldZ) {
+  const grid        = state.terrainData.grid;
+  const columnCount = grid.column_count;
+  const elevations  = grid.elevation_list;
+  const columnValue = clampValue((worldX + state.terrainWidth / 2) / state.terrainWidth, 0, 1) * (columnCount - 1);
+  const rowValue    = clampValue(getRowRatio(worldZ), 0, 1) * (grid.row_count - 1);
+  const leftColumn  = Math.floor(columnValue);
+  const upperRow    = Math.floor(rowValue);
+  const rightColumn = Math.min(leftColumn + 1, columnCount - 1);
+  const lowerRow    = Math.min(upperRow + 1, grid.row_count - 1);
+  const columnFraction = columnValue - leftColumn;
+  const rowFraction    = rowValue - upperRow;
+  const readAt = (row, column) => elevations[row * columnCount + column];
+  return readAt(upperRow, leftColumn)  * (1 - columnFraction) * (1 - rowFraction) +
+         readAt(upperRow, rightColumn) * columnFraction       * (1 - rowFraction) +
+         readAt(lowerRow, leftColumn)  * (1 - columnFraction) * rowFraction +
+         readAt(lowerRow, rightColumn) * columnFraction       * rowFraction;
+}
+
+function getWorldPosition(longitude, latitude) {
+  const grid        = state.terrainData.grid;
+  const columnCount = grid.column_count;
+  const rowCount    = grid.row_count;
+  const firstLongitude = grid.longitude_list[0];
+  const lastLongitude  = grid.longitude_list[columnCount - 1];
+  const firstLatitude  = grid.latitude_list[0];
+  const lastLatitude   = grid.latitude_list[rowCount - 1];
+  const columnRatio = (longitude - firstLongitude) / (lastLongitude - firstLongitude);
+  const rowRatio    = (latitude  - firstLatitude ) / (lastLatitude  - firstLatitude );
+  if (columnRatio < 0 || columnRatio > 1 || rowRatio < 0 || rowRatio > 1) return null;
+  const zRatio = state.isLatitudeDescending ? rowRatio : 1 - rowRatio;
+  return {
+    x : columnRatio * state.terrainWidth - state.terrainWidth / 2,
+    z : zRatio      * state.terrainDepth - state.terrainDepth / 2
+  };
+}
+
+////////////////////////////////////////////////////
+// 봉우리 이름표
+////////////////////////////////////////////////////
+
+function buildLabelSprite(text, worldHeight = 1.15) {
+  const canvas  = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  const fontStyle = "500 40px Consolas, D2Coding, Menlo, monospace";
+  context.font = fontStyle;
+  canvas.width  = Math.ceil(context.measureText(text).width) + 36;
+  canvas.height = 64;
+
+  context.font         = fontStyle;
+  context.fillStyle    = "rgba(12, 18, 16, 0.80)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle    = "#d8ff55";
+  context.textBaseline = "middle";
+  context.fillText(text, 18, 34);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map : texture, transparent : true }));
+  sprite.scale.set(worldHeight * canvas.width / canvas.height, worldHeight, 1);
+  return sprite;
+}
+
+function buildLabelGroup() {
+  const group = new THREE.Group();
+  // 지도가 넓을수록 이름표도 커야 읽힌다. 폭(km)에 비례시키되 하한을 둔다.
+  const labelWorldHeight = Math.max(1.15, state.terrainWidth * 0.02);
+  for (const peak of PEAK_LIST) {
+    // 이 지도 폭에서 보이기로 정한 산만. 전국이면 명산만, 확대하면 근교 산까지.
+    if (state.terrainWidth > (peak.maxSpanKm ?? Infinity)) continue;
+    const position = getWorldPosition(peak.longitude, peak.latitude);
+    if (!position) continue;   // 격자 범위 밖은 자동 제외
+    const sample = getGridSample(position.x, position.z);
+    const sprite = buildLabelSprite(`${peak.name} ${Math.round(sample.elevationMeter)}m`, labelWorldHeight);
+    sprite.position.set(position.x, 0, position.z);
+    sprite.userData.elevationMeter = sample.elevationMeter;
+    group.add(sprite);
+  }
+  return group;
+}
+
+////////////////////////////////////////////////////
+// 단면
+////////////////////////////////////////////////////
+
+function buildSectionSamples(startPoint, endPoint) {
+  const sampleList = [];
+  for (let sampleIndex = 0; sampleIndex < SECTION_SAMPLE_COUNT; sampleIndex += 1) {
+    const ratio = sampleIndex / (SECTION_SAMPLE_COUNT - 1);
+    const worldX = startPoint.x + (endPoint.x - startPoint.x) * ratio;
+    const worldZ = startPoint.z + (endPoint.z - startPoint.z) * ratio;
+    sampleList.push({ worldX, worldZ, elevationMeter : sampleElevation(worldX, worldZ) });
+  }
+  return sampleList;
+}
+
+function rebuildSectionLine() {
+  disposeObject(scene, state.sectionLine);
+  state.sectionLine = null;
+  if (!state.sectionSampleList) return;
+
+  const vertexList = [];
+  for (const sample of state.sectionSampleList) {
+    vertexList.push(sample.worldX, sample.elevationMeter * BASE_ELEVATION_SCALE * state.exaggeration + 0.03, sample.worldZ);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertexList, 3));
+  const material = new THREE.LineBasicMaterial({ color : 0xd8ff55, transparent : true, opacity : 0.9, depthTest : false });
+  state.sectionLine = new THREE.Line(geometry, material);
+  state.sectionLine.renderOrder = 3;
+  scene.add(state.sectionLine);
+}
+
+function drawSectionChart() {
+  const chartElement = document.getElementById("section-chart");
+  if (!state.sectionSampleList) {
+    chartElement.classList.remove("visible");
+    chartElement.innerHTML = "";
+    return;
+  }
+
+  const sampleList  = state.sectionSampleList;
+  const firstSample = sampleList[0];
+  const lastSample  = sampleList[sampleList.length - 1];
+  const lengthKm    = Math.hypot(lastSample.worldX - firstSample.worldX, lastSample.worldZ - firstSample.worldZ);
+  const elevationList = sampleList.map((sample) => sample.elevationMeter);
+  const lowestMeter  = Math.min(...elevationList);
+  const highestMeter = Math.max(...elevationList);
+  const span         = Math.max(1, highestMeter - lowestMeter);
+
+  const chartWidth  = 244;
+  const chartHeight = 72;
+  const pointList = sampleList.map((sample, sampleIndex) => {
+    const x = sampleIndex / (sampleList.length - 1) * chartWidth;
+    const y = chartHeight - (sample.elevationMeter - lowestMeter) / span * (chartHeight - 6) - 3;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+
+  chartElement.innerHTML = `
+    <div class="tag">단면</div>
+    <svg viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="선택한 두 지점 사이의 고도 단면">
+      <polygon points="0,${chartHeight} ${pointList} ${chartWidth},${chartHeight}" fill="rgba(216,255,85,0.10)"></polygon>
+      <polyline points="${pointList}" fill="none" stroke="#d8ff55" stroke-width="1.4"></polyline>
+    </svg>
+    <div class="row muted"><span>길이</span><b>${lengthKm.toFixed(2)} km</b></div>
+    <div class="row muted"><span>최저 · 최고</span><b>${Math.round(lowestMeter)} · ${Math.round(highestMeter)} m</b></div>
+  `;
+  chartElement.classList.add("visible");
+}
+
+function clearSection() {
+  state.sectionMode       = false;
+  state.sectionStartPoint = null;
+  state.sectionSampleList = null;
+  rebuildSectionLine();
+  drawSectionChart();
+  refreshHud();
+  updateStatusHint();
+}
+
+function toggleSectionMode() {
+  if (state.sectionMode || state.sectionSampleList) {
+    clearSection();
+    return;
+  }
+  state.sectionMode       = true;
+  state.sectionStartPoint = null;
+  refreshHud();
+  updateStatusHint();
+}
+
+function handleSectionPick(worldPoint) {
+  if (!state.sectionStartPoint) {
+    state.sectionStartPoint = { x : worldPoint.x, z : worldPoint.z };
+    updateStatusHint();
+    return;
+  }
+  state.sectionSampleList = buildSectionSamples(state.sectionStartPoint, { x : worldPoint.x, z : worldPoint.z });
+  state.sectionMode       = false;
+  state.sectionStartPoint = null;
+  rebuildSectionLine();
+  drawSectionChart();
+  refreshHud();
+  updateStatusHint();
+}
+
+////////////////////////////////////////////////////
+// 커서 조회
+////////////////////////////////////////////////////
+
+function pickTerrainPoint(clientX, clientY) {
+  if (!state.terrainMesh) return null;
+  pointerVector.x =  clientX / window.innerWidth  * 2 - 1;
+  pointerVector.y = -clientY / window.innerHeight * 2 + 1;
+  raycaster.setFromCamera(pointerVector, camera);
+  const hitList = raycaster.intersectObject(state.terrainMesh, false);
+  return hitList.length ? hitList[0].point : null;
+}
+
+function updateCursorReadout(worldPoint) {
+  const cursorElement     = document.getElementById("value-cursor");
+  const coordinateElement = document.getElementById("value-cursor-coordinate");
+
+  if (!worldPoint) {
+    cursorElement.textContent     = "—";
+    coordinateElement.textContent = "—";
+    if (state.cursorMarker) state.cursorMarker.visible = false;
+    return;
+  }
+
+  const sample = getGridSample(worldPoint.x, worldPoint.z);
+  cursorElement.textContent     = `${Math.round(sample.elevationMeter)} m`;
+  coordinateElement.textContent = `${sample.latitude.toFixed(4)} , ${sample.longitude.toFixed(4)}`;
+
+  if (state.cursorMarker) {
+    state.cursorMarker.position.set(worldPoint.x, worldPoint.y + 0.05, worldPoint.z);
+    state.cursorMarker.visible = true;
+  }
+}
+
+////////////////////////////////////////////////////
+// 시점
+////////////////////////////////////////////////////
+
+function getViewDistance() {
+  return Math.max(state.terrainWidth, state.terrainDepth) * 1.25;
+}
+
+function getTargetHeight() {
+  return (state.minimumElevation + state.maximumElevation) / 2 * BASE_ELEVATION_SCALE * state.exaggeration;
+}
+
+function applyViewLimits() {
+  const distance = getViewDistance();
+  controls.minDistance = distance * 0.18;
+  controls.maxDistance = distance * 2.4;
+  camera.far           = distance * 6;
+  camera.updateProjectionMatrix();
+  scene.fog.density    = 0.66 / distance;
+}
+
+function resetCamera() {
+  const cameraYaw   = 0.89;
+  const cameraPitch = 0.52;
+  const distance    = getViewDistance();
+  const horizontal  = distance * Math.cos(cameraPitch);
+  const targetY     = getTargetHeight();
+  applyViewLimits();
+  controls.target.set(0, targetY, 0);
+  camera.position.set(
+    horizontal * Math.cos(cameraYaw),
+    targetY + distance * Math.sin(cameraPitch),
+    horizontal * Math.sin(cameraYaw)
+  );
+  controls.update();
+}
+
+function setTopView() {
+  const targetY = getTargetHeight();
+  applyViewLimits();
+  controls.target.set(0, targetY, 0);
+  camera.position.set(0, targetY + getViewDistance() * 0.92, 0.001);
+  controls.update();
+}
+
+////////////////////////////////////////////////////
+// 조작 적용
+////////////////////////////////////////////////////
+
+function setExaggeration(nextValue) {
+  state.exaggeration = clampValue(Math.round(nextValue * 2) / 2, 1, 8);
+  applyExaggeration();
+  refreshHud();
+}
+
+function cycleContourInterval() {
+  const intervalList = [25, 50, 100];
+  const nextIndex    = (intervalList.indexOf(state.contourInterval) + 1) % intervalList.length;
+  setContourInterval(intervalList[nextIndex]);
+}
+
+function setContourInterval(intervalMeter) {
+  if (state.contourInterval === intervalMeter) return;
+  state.contourInterval = intervalMeter;
+  refreshHud();
+  // 마칭 스퀘어는 격자가 커지면 오래 걸린다. HUD 를 먼저 그린 뒤 계산한다.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    rebuildContour();
+    writeHashState();
+  }));
+}
+
+function toggleContour() {
+  state.contourVisible = !state.contourVisible;
+  state.contourGroup.visible = state.contourVisible;
+  refreshHud();
+}
+
+function cycleColorMode() {
+  state.colorMode = COLOR_MODE_LIST[(COLOR_MODE_LIST.indexOf(state.colorMode) + 1) % COLOR_MODE_LIST.length];
+  applyColorMode();
+  refreshHud();
+}
+
+function setWaterLevel(levelMeter) {
+  state.waterLevelMeter = levelMeter === null ? null : clampValue(Math.round(levelMeter / 10) * 10, 0, Math.ceil(state.maximumElevation / 10) * 10);
+  state.waterMesh.visible = state.waterLevelMeter !== null;
+  applyExaggeration();
+  refreshHud();
+}
+
+function stepWaterLevel(deltaMeter) {
+  if (state.waterLevelMeter === null) {
+    setWaterLevel(deltaMeter > 0 ? 20 : 0);
+    return;
+  }
+  setWaterLevel(state.waterLevelMeter + deltaMeter);
+}
+
+function stepSunAzimuth(deltaDegree) {
+  state.sunAzimuthDegree = (state.sunAzimuthDegree + deltaDegree + 360) % 360;
+  applySunDirection();
+  refreshHud();
+}
+
+function toggleLabels() {
+  state.labelsVisible = !state.labelsVisible;
+  state.labelGroup.visible = state.labelsVisible;
+  refreshHud();
+}
+
+function toggleWireframe() {
+  state.wireframeVisible = !state.wireframeVisible;
+  state.terrainMesh.material.wireframe = state.wireframeVisible;
+  refreshHud();
+}
+
+function captureScreen() {
+  renderer.render(scene, camera);
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "_");
+  const anchor = document.createElement("a");
+  anchor.download = `seoul_terrain_${stamp}.png`;
+  anchor.href     = renderer.domElement.toDataURL("image/png");
+  anchor.click();
+}
+
+function updateStatusHint() {
+  if (!state.sectionMode) {
+    statusElement.classList.remove("hint");
+    return;
+  }
+  statusElement.classList.add("hint");
+  statusElement.textContent = state.sectionStartPoint
+    ? "단면: 끝점을 찍으세요"
+    : "단면: 시작점을 찍으세요";
+}
+
+function refreshHud() {
+  document.getElementById("value-scale").textContent     = state.exaggeration.toFixed(1);
+  document.getElementById("value-contour").textContent   = state.contourVisible ? "켜짐" : "꺼짐";
+  document.getElementById("value-interval").textContent  = state.contourInterval;
+  document.getElementById("value-color").textContent     = COLOR_MODE_LABEL[state.colorMode];
+  document.getElementById("value-water").textContent     = state.waterLevelMeter === null ? "꺼짐" : `${state.waterLevelMeter} m`;
+  document.getElementById("value-sun").textContent       = state.sunAzimuthDegree;
+  document.getElementById("value-labels").textContent    = state.labelsVisible ? "켜짐" : "꺼짐";
+  document.getElementById("value-wireframe").textContent = state.wireframeVisible ? "켜짐" : "꺼짐";
+
+  const sectionButton = document.getElementById("section-button");
+  sectionButton.classList.toggle("armed", state.sectionMode);
+  sectionButton.textContent = (state.sectionMode || state.sectionSampleList) ? "단면 지우기" : "단면 그리기";
+
+  writeHashState();
+}
+
+////////////////////////////////////////////////////
+// 주소 해시로 상태 공유
+////////////////////////////////////////////////////
+
+let hashWriteTimer  = 0;
+let hashWriteBroken = false;   // srcdoc 등 replaceState 가 막힌 환경에서는 한 번 실패 후 끈다.
+
+function writeHashState() {
+  if (!state.terrainData || hashWriteBroken) return;
+  clearTimeout(hashWriteTimer);
+  hashWriteTimer = setTimeout(() => {
+    const parameters = new URLSearchParams({
+      e : state.exaggeration.toFixed(1),
+      i : state.contourInterval,
+      c : state.contourVisible ? 1 : 0,
+      m : state.colorMode,
+      s : state.sunAzimuthDegree,
+      l : state.labelsVisible ? 1 : 0,
+      g : state.wireframeVisible ? 1 : 0,
+      cam : [camera.position, controls.target].flatMap((vector) => [vector.x, vector.y, vector.z]).map((value) => value.toFixed(2)).join(",")
+    });
+    if (state.waterLevelMeter !== null) parameters.set("w", state.waterLevelMeter);
+    try {
+      history.replaceState(null, "", `#${parameters.toString()}`);
+    } catch (error) {
+      // 샌드박스(about:srcdoc)에서는 URL 변경이 막혀 있다. 공유 링크만 포기하고 나머지는 그대로.
+      hashWriteBroken = true;
+    }
+  }, 350);
+}
+
+function readHashState() {
+  let rawHash = "";
+  try {
+    rawHash = location.hash;
+  } catch (error) {
+    return;   // 샌드박스에서 location 접근이 막힌 경우.
+  }
+  if (!rawHash) return;
+  const parameters = new URLSearchParams(rawHash.slice(1));
+  const readNumber = (key, fallback) => {
+    const value = Number(parameters.get(key));
+    return parameters.has(key) && Number.isFinite(value) ? value : fallback;
+  };
+
+  state.exaggeration     = clampValue(readNumber("e", state.exaggeration), 1, 8);
+  state.contourInterval  = [25, 50, 100].includes(readNumber("i", 0)) ? readNumber("i", 50) : state.contourInterval;
+  state.contourVisible   = parameters.get("c") !== "0";
+  state.colorMode        = COLOR_MODE_LIST.includes(parameters.get("m")) ? parameters.get("m") : state.colorMode;
+  state.sunAzimuthDegree = (readNumber("s", state.sunAzimuthDegree) + 360) % 360;
+  state.labelsVisible    = parameters.get("l") !== "0";
+  state.wireframeVisible = parameters.get("g") === "1";
+  if (parameters.has("w")) state.waterLevelMeter = readNumber("w", null);
+
+  const cameraValues = (parameters.get("cam") ?? "").split(",").map(Number);
+  if (cameraValues.length === 6 && cameraValues.every(Number.isFinite)) state.restoredCamera = cameraValues;
+}
+
+////////////////////////////////////////////////////
+// 데이터 적재
+////////////////////////////////////////////////////
+
+// 뷰어에 넘기기 전에 형태를 확인한다. 실패하면 무엇이 어긋났는지 그대로 알려 준다.
+function validateTerrainData(terrainData) {
+  const grid = terrainData?.grid;
+  if (!grid) throw new Error("grid 항목이 없습니다");
+
+  const { column_count : columnCount, row_count : rowCount } = grid;
+  if (!Number.isInteger(columnCount) || !Number.isInteger(rowCount) || columnCount < 2 || rowCount < 2) {
+    throw new Error("column_count 와 row_count 는 2 이상의 정수여야 합니다");
+  }
+  if (!Array.isArray(grid.elevation_list) || grid.elevation_list.length !== columnCount * rowCount) {
+    throw new Error(`elevation_list 길이가 ${columnCount * rowCount} 이어야 하는데 ${grid.elevation_list?.length ?? 0} 입니다`);
+  }
+  if (!Array.isArray(grid.longitude_list) || grid.longitude_list.length !== columnCount) {
+    throw new Error(`longitude_list 길이가 column_count(${columnCount}) 와 다릅니다`);
+  }
+  if (!Array.isArray(grid.latitude_list) || grid.latitude_list.length !== rowCount) {
+    throw new Error(`latitude_list 길이가 row_count(${rowCount}) 와 다릅니다`);
+  }
+}
+
+// Math.min(...list) 은 격자가 커지면 인자 개수 한계에 걸린다. 한 번 훑어서 구한다.
+function getElevationRange(elevationList) {
+  let minimum = Infinity;
+  let maximum = -Infinity;
+  for (const elevationMeter of elevationList) {
+    if (elevationMeter < minimum) minimum = elevationMeter;
+    if (elevationMeter > maximum) maximum = elevationMeter;
+  }
+  return [minimum, maximum];
+}
+
+function clearTerrain() {
+  disposeObject(terrainGroup, state.contourGroup);
+  disposeObject(terrainGroup, state.terrainMesh);
+  disposeObject(scene,        state.baseMesh);
+  disposeObject(scene,        state.waterMesh);
+  disposeObject(scene,        state.labelGroup);
+  disposeObject(scene,        state.sectionLine);
+  disposeObject(scene,        state.cursorMarker);
+  state.contourGroup = state.terrainMesh = state.baseMesh = null;
+  state.waterMesh = state.labelGroup = state.sectionLine = state.cursorMarker = null;
+  state.sectionSampleList = null;
+  state.sectionStartPoint = null;
+  state.sectionMode       = false;
+}
+
+// 좌상단 좌표 태그. 격자 중심을 도·분으로 적는다. (예: 37 33 N / 126 59 E)
+function formatBoundsTag(grid) {
+  const centerLongitude = (grid.longitude_list[0] + grid.longitude_list[grid.longitude_list.length - 1]) / 2;
+  const centerLatitude  = (grid.latitude_list[0]  + grid.latitude_list[grid.latitude_list.length - 1])  / 2;
+  const toDegreeMinute = (value) => {
+    const degree = Math.floor(Math.abs(value));
+    const minute = Math.round((Math.abs(value) - degree) * 60);
+    return `${degree} ${String(minute).padStart(2, "0")}`;
+  };
+  const latitudeHemisphere  = centerLatitude  >= 0 ? "N" : "S";
+  const longitudeHemisphere = centerLongitude >= 0 ? "E" : "W";
+  return `${toDegreeMinute(centerLatitude)} ${latitudeHemisphere} / ${toDegreeMinute(centerLongitude)} ${longitudeHemisphere}`;
+}
+
+function startViewer(terrainData) {
+  validateTerrainData(terrainData);
+  clearTerrain();
+  state.terrainData = terrainData;
+
+  const grid           = terrainData.grid;
+  const metadata       = terrainData.metadata ?? {};
+  const columnCount    = grid.column_count;
+  const rowCount       = grid.row_count;
+  const lastLatitude   = grid.latitude_list[rowCount - 1];
+  const centerLatitude = (grid.latitude_list[0] + lastLatitude) / 2;
+
+  state.terrainWidth = Math.abs(grid.longitude_list[columnCount - 1] - grid.longitude_list[0])
+                       * 111.32 * Math.cos(centerLatitude * Math.PI / 180);
+  state.terrainDepth = Math.abs(grid.latitude_list[0] - lastLatitude) * 111.32;
+
+  // 위도가 오름차순으로 들어와도 북쪽이 -Z 에 오도록 행 순서를 뒤집는다.
+  state.isLatitudeDescending = grid.latitude_list[0] >= lastLatitude;
+  state.positionXList = Array.from({ length : columnCount }, (unused, columnIndex) =>
+    columnIndex / (columnCount - 1) * state.terrainWidth - state.terrainWidth / 2);
+  state.positionZList = Array.from({ length : rowCount }, (unused, rowIndex) => {
+    const ratio = rowIndex / (rowCount - 1);
+    return (state.isLatitudeDescending ? ratio : 1 - ratio) * state.terrainDepth - state.terrainDepth / 2;
+  });
+
+  const [minimumMeter, maximumMeter] = getElevationRange(grid.elevation_list);
+  state.minimumElevation = metadata.minimum_elevation_meter ?? minimumMeter;
+  state.maximumElevation = metadata.maximum_elevation_meter ?? maximumMeter;
+
+  state.baseMesh     = buildTerrainBase();
+  state.terrainMesh  = buildTerrainMesh();
+  state.waterMesh    = buildWaterMesh();
+  state.cursorMarker = buildCursorMarker();
+  scene.add(state.baseMesh, state.waterMesh, state.cursorMarker);
+  terrainGroup.add(state.terrainMesh);
+
+  applyColorMode();
+  state.terrainMesh.material.wireframe = state.wireframeVisible;
+  rebuildContour();
+
+  // 만들어 낸 지형에는 실제 봉우리 이름을 얹지 않는다.
+  state.labelGroup = buildLabelGroup();
+  if (metadata.is_sample) state.labelsVisible = false;
+  state.labelGroup.visible = state.labelsVisible;
+  scene.add(state.labelGroup);
+
+  applyExaggeration();
+  applySunDirection();
+  if (state.waterLevelMeter !== null) setWaterLevel(state.waterLevelMeter);
+
+  document.getElementById("value-title").textContent     = metadata.title ?? "지형 뷰어";
+  document.title = metadata.title ? `${metadata.title} — WebGL` : "지형 뷰어 — WebGL";
+  document.getElementById("value-bounds").textContent    = formatBoundsTag(grid);
+  document.getElementById("value-elevation").textContent = `${state.minimumElevation} – ${state.maximumElevation} m`;
+  document.getElementById("value-grid").textContent      = metadata.visualization_grid_size ?? `${columnCount} × ${rowCount}`;
+  document.getElementById("value-source").textContent    = metadata.source ?? "—";
+
+  resetCamera();
+  if (state.restoredCamera) {
+    const [cameraX, cameraY, cameraZ, targetX, targetY, targetZ] = state.restoredCamera;
+    camera.position.set(cameraX, cameraY, cameraZ);
+    controls.target.set(targetX, targetY, targetZ);
+    controls.update();
+    state.restoredCamera = null;
+  }
+
+  drawSectionChart();
+  refreshHud();
+  updateCursorReadout(null);
+  loaderElement.classList.add("hidden");
+  hudElement.hidden = false;
+
+  if (!state.renderLoopStarted) {
+    state.renderLoopStarted = true;
+    renderLoop();
+  }
+}
+
+// 로더에 실패 원인과 다음 행동을 남긴다.
+function showLoaderError(message) {
+  loaderElement.classList.remove("hidden");
+  hudElement.hidden = true;
+  loaderElement.querySelector("h2").textContent = "이 데이터는 열지 못했습니다";
+  loaderElement.querySelector("p").textContent  = `${message}. 다른 JSON 을 고르거나 샘플 지형으로 뷰어를 확인해 보세요.`;
+}
+
+////////////////////////////////////////////////////
+// 렌더 루프와 입력
+////////////////////////////////////////////////////
+
+function renderLoop() {
+  requestAnimationFrame(renderLoop);
+
+  // 레이캐스트는 프레임당 한 번만. 커서가 여러 번 움직여도 마지막 위치만 쓴다.
+  if (state.pendingPointer) {
+    const { clientX, clientY } = state.pendingPointer;
+    state.pendingPointer = null;
+    updateCursorReadout(pickTerrainPoint(clientX, clientY));
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+
+  state.frameCount += 1;
+  const now = performance.now();
+  if (now - state.frameTimestamp >= 500) {
+    const frameRate = Math.round(state.frameCount * 1000 / (now - state.frameTimestamp));
+    if (!state.sectionMode) {
+      statusElement.textContent = `${window.innerWidth} × ${window.innerHeight} · ${frameRate} fps`;
+    }
+    state.frameCount = 0;
+    state.frameTimestamp = now;
+  }
+}
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+const ACTION_TABLE = {
+  "exaggeration-up"   : () => setExaggeration(state.exaggeration + 0.5),
+  "exaggeration-down" : () => setExaggeration(state.exaggeration - 0.5),
+  "contour"           : toggleContour,
+  "interval"          : cycleContourInterval,
+  "color-mode"        : cycleColorMode,
+  "water-up"          : () => stepWaterLevel(10),
+  "water-down"        : () => stepWaterLevel(-10),
+  "sun-left"          : () => stepSunAzimuth(-15),
+  "sun-right"         : () => stepSunAzimuth(15),
+  "labels"            : toggleLabels,
+  "wireframe"         : toggleWireframe,
+  "section"           : toggleSectionMode,
+  "top"               : setTopView,
+  "reset"             : resetCamera,
+  "capture"           : captureScreen
+};
+
+hudElement.addEventListener("click", (event) => {
+  const target = event.target.closest("[data-action]");
+  if (!target || !state.terrainData) return;
+  ACTION_TABLE[target.dataset.action]?.();
+});
+
+window.addEventListener("keydown", (event) => {
+  if (!state.terrainData) return;
+  const intervalByKey = { "1" : 25, "2" : 50, "3" : 100 };
+
+  if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+    event.preventDefault();
+    setExaggeration(state.exaggeration + (event.key === "ArrowUp" ? 0.5 : -0.5));
+  } else if (event.key === "c" || event.key === "C") {
+    toggleContour();
+  } else if (event.key in intervalByKey) {
+    setContourInterval(intervalByKey[event.key]);
+  } else if (event.key === "0") {
+    setWaterLevel(state.waterLevelMeter === null ? Math.round(state.maximumElevation / 4 / 10) * 10 : null);
+  } else if (event.key === "-" || event.key === "_") {
+    stepWaterLevel(-10);
+  } else if (event.key === "=" || event.key === "+") {
+    stepWaterLevel(10);
+  } else if (event.key === "[") {
+    stepSunAzimuth(-15);
+  } else if (event.key === "]") {
+    stepSunAzimuth(15);
+  } else if (event.key === "m" || event.key === "M") {
+    cycleColorMode();
+  } else if (event.key === "l" || event.key === "L") {
+    toggleLabels();
+  } else if (event.key === "w" || event.key === "W") {
+    toggleWireframe();
+  } else if (event.key === "p" || event.key === "P") {
+    toggleSectionMode();
+  } else if (event.key === "t" || event.key === "T") {
+    setTopView();
+  } else if (event.key === "s" || event.key === "S") {
+    captureScreen();
+  } else if (event.key === "r" || event.key === "R") {
+    resetCamera();
+  } else if (event.key === "Escape" && (state.sectionMode || state.sectionSampleList)) {
+    clearSection();
+  }
+});
+
+// 커서 조회. 화면을 끌어 회전한 경우는 조회로 치지 않는다.
+let pointerDownPosition = null;
+
+renderer.domElement.addEventListener("pointerdown", (event) => {
+  pointerDownPosition = { x : event.clientX, y : event.clientY };
+});
+
+renderer.domElement.addEventListener("pointermove", (event) => {
+  if (event.pointerType === "mouse") state.pendingPointer = { clientX : event.clientX, clientY : event.clientY };
+});
+
+renderer.domElement.addEventListener("pointerup", (event) => {
+  const movedDistance = pointerDownPosition
+    ? Math.hypot(event.clientX - pointerDownPosition.x, event.clientY - pointerDownPosition.y)
+    : Infinity;
+  pointerDownPosition = null;
+  if (movedDistance > 6) return;
+
+  const worldPoint = pickTerrainPoint(event.clientX, event.clientY);
+  if (!worldPoint) return;
+  updateCursorReadout(worldPoint);
+  if (state.sectionMode) handleSectionPick(worldPoint);
+});
+
+renderer.domElement.addEventListener("pointerleave", () => updateCursorReadout(null));
+
+controls.addEventListener("end", writeHashState);
+
+////////////////////////////////////////////////////
+// 파일 입력
+////////////////////////////////////////////////////
+
+function readTerrainFile(file) {
+  const reader = new FileReader();
+  reader.onload  = () => {
+    try {
+      startViewer(JSON.parse(reader.result));
+    } catch (error) {
+      showLoaderError(`${file.name} — ${error.message}`);
+    }
+  };
+  reader.onerror = () => showLoaderError(`${file.name} 을 읽지 못했습니다`);
+  reader.readAsText(file);
+}
+
+document.getElementById("pick-button").addEventListener("click", () => document.getElementById("file-input").click());
+document.getElementById("file-input").addEventListener("change", (event) => {
+  if (event.target.files[0]) readTerrainFile(event.target.files[0]);
+});
+document.getElementById("sample-button").addEventListener("click", () => startViewer(buildSampleTerrain()));
+document.getElementById("load-korea-button").addEventListener("click", () => loadRemoteTerrain());
+
+window.addEventListener("dragover", (event) => event.preventDefault());
+window.addEventListener("drop", (event) => {
+  event.preventDefault();
+  if (event.dataTransfer.files[0]) readTerrainFile(event.dataTransfer.files[0]);
+});
+
+// 전국 고도 데이터. 로컬 사본이 있으면 그쪽을 먼저 쓰고, 없으면 원본을 내려받는다.
+const KOREA_DATA_SOURCES = [
+  "data/korea_elevation.json",
+  "https://raw.githubusercontent.com/kei-soft/File/master/korea_elevation.json"
+];
+
+let remoteLoadInProgress = false;
+
+async function loadRemoteTerrain() {
+  if (remoteLoadInProgress) return;
+  remoteLoadInProgress = true;
+  loaderElement.classList.remove("hidden");
+  hudElement.hidden = true;
+  loaderElement.querySelector("h2").textContent = "전국 고도 데이터를 내려받는 중…";
+  loaderElement.querySelector("p").textContent  = "약 1 MB 입니다. 잠시만 기다려 주세요.";
+
+  let lastError = null;
+  for (const url of KOREA_DATA_SOURCES) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) { lastError = `${url} — HTTP ${response.status}`; continue; }
+      const terrainData = await response.json();
+      remoteLoadInProgress = false;
+      startViewer(terrainData);
+      return;
+    } catch (error) {
+      lastError = `${url} — ${error.message}`;
+    }
+  }
+
+  remoteLoadInProgress = false;
+  showLoaderError(`전국 데이터를 불러오지 못했습니다 (${lastError})`);
+  loaderElement.querySelector("p").textContent += " 네트워크가 막혀 있으면 파일을 직접 내려받아 끌어다 놓으세요.";
+}
+
+readHashState();
+
+// 자동 로드: 전국 데이터를 조용히 시도한다. 실패하면 로더를 남겨 사용자가 직접 고르게 한다.
+(async function autoLoadTerrain() {
+  for (const url of KOREA_DATA_SOURCES) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      startViewer(await response.json());
+      return;
+    } catch (error) {
+      /* 다음 소스로 넘어간다. */
+    }
+  }
+  /* 전부 실패. 로더의 버튼으로 사용자가 직접 로드한다. */
+})();
+
+// 데이터 파일이 없을 때 뷰어 동작만 확인하기 위한 형상. 실제 측량값이 아니다.
+function buildSampleTerrain() {
+  const columnCount = 121;
+  const rowCount    = 91;
+  const peakList    = [[0.62, 0.22, 0.10, 780], [0.28, 0.35, 0.12, 480], [0.75, 0.68, 0.09, 340], [0.15, 0.72, 0.14, 260]];
+  const elevations  = [];
+  for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+    for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
+      const u = columnIndex / (columnCount - 1);
+      const v = rowIndex / (rowCount - 1);
+      let height = 24 + 14 * Math.sin(u * 7.1) * Math.cos(v * 5.3);
+      for (const [peakU, peakV, spread, peakHeight] of peakList) {
+        const distanceSquared = (u - peakU) ** 2 + (v - peakV) ** 2;
+        height += peakHeight * Math.exp(-distanceSquared / (2 * spread * spread));
+      }
+      const riverBand = Math.exp(-((v - 0.52 + 0.05 * Math.sin(u * 6.0)) ** 2) / 0.0009);
+      elevations.push(Math.max(0, Math.round(height * (1 - 0.85 * riverBand))));
+    }
+  }
+  const [minimumMeter, maximumMeter] = getElevationRange(elevations);
+  return {
+    metadata : {
+      title                   : "샘플 지형 (실측 아님)",
+      source                  : "생성된 샘플",
+      is_sample               : true,
+      visualization_grid_size : `${columnCount} × ${rowCount}`,
+      minimum_elevation_meter : minimumMeter,
+      maximum_elevation_meter : maximumMeter
+    },
+    grid : {
+      column_count   : columnCount,
+      row_count      : rowCount,
+      longitude_list : Array.from({ length : columnCount }, (unused, index) => 126.764 + (127.184 - 126.764) * index / (columnCount - 1)),
+      latitude_list  : Array.from({ length : rowCount    }, (unused, index) => 37.716 - (37.716 - 37.413) * index / (rowCount - 1)),
+      elevation_list : elevations
+    }
+  };
+}
+</script>
+</body>
+</html>
