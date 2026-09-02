@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>한국 지하철 실시간 위치 지도</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    #map {
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    
+    /* 상단 컨트롤 패널 */
+    .control-panel {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 1000;
+      background: rgba(20, 20, 40, 0.92);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      max-width: 340px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .control-panel h1 {
+      font-size: 16px;
+      margin-bottom: 8px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .control-panel h1 span {
+      font-size: 20px;
+    }
+    
+    .status {
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+    
+    .status.ok { color: #4ade80; }
+    .status.error { color: #f87171; }
+    .status.loading { color: #fbbf24; }
+    
+    .api-section {
+      margin-bottom: 12px;
+    }
+    
+    .api-section label {
+      display: block;
+      font-size: 12px;
+      color: #bbb;
+      margin-bottom: 4px;
+    }
+    
+    .api-section input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #444;
+      border-radius: 6px;
+      background: #0f0f1a;
+      color: #fff;
+      font-size: 13px;
+    }
+    
+    .api-section input:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+    
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    
+    button {
+      flex: 1;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+    
+    .btn-secondary {
+      background: #374151;
+      color: #e5e7eb;
+    }
+    
+    .btn-secondary:hover {
+      background: #4b5563;
+    }
+    
+    /* 호선 선택 */
+    .line-select {
+      margin-top: 12px;
+    }
+    
+    .line-select label {
+      font-size: 12px;
+      color: #bbb;
+      display: block;
+      margin-bottom: 6px;
+    }
+    
+    .line-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    
+    .chip {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid #444;
+      background: #1f2937;
+      color: #ccc;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    
+    .chip.active {
+      background: #3b82f6;
+      border-color: #3b82f6;
+      color: white;
+    }
+    
+    .chip:hover {
+      border-color: #6b7280;
+    }
+    
+    /* 범례 */
+    .legend {
+      position: absolute;
+      bottom: 20px;
+      right: 12px;
+      z-index: 1000;
+      background: rgba(20, 20, 40, 0.9);
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .legend-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 3px 0;
+      color: #ccc;
+    }
+    
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    
+    /* 안내 박스 */
+    .info-box {
+      position: absolute;
+      bottom: 20px;
+      left: 12px;
+      z-index: 1000;
+      background: rgba(20, 20, 40, 0.92);
+      padding: 14px 16px;
+      border-radius: 10px;
+      font-size: 12px;
+      max-width: 300px;
+      line-height: 1.5;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #bbb;
+    }
+    
+    .info-box strong {
+      color: #fff;
+    }
+    
+    .info-box a {
+      color: #60a5fa;
+      text-decoration: none;
+    }
+    
+    .info-box a:hover {
+      text-decoration: underline;
+    }
+    
+    /* 열차 팝업 스타일 */
+    .leaflet-popup-content {
+      margin: 10px 12px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    
+    .train-popup strong {
+      color: #1e40af;
+    }
+    
+    /* 반응형 */
+    @media (max-width: 600px) {
+      .control-panel {
+        max-width: calc(100% - 24px);
+        padding: 12px;
+      }
+      .info-box {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  
+  <!-- 컨트롤 패널 -->
+  <div class="control-panel">
+    <h1><span>🚄</span> 한국 지하철 실시간 위치</h1>
+    <div id="status" class="status">API 키를 입력하고 시작 버튼을 눌러주세요</div>
+    
+    <div class="api-section">
+      <label for="apiKey">서울 열린데이터광장 API 키</label>
+      <input type="text" id="apiKey" placeholder="발급받은 인증키를 붙여넣으세요" autocomplete="off">
+      <div class="btn-row">
+        <button class="btn-primary" onclick="startTracking()">시작 / 갱신</button>
+        <button class="btn-secondary" onclick="stopTracking()">중지</button>
+      </div>
+    </div>
+    
+    <div class="line-select">
+      <label>표시할 호선 선택</label>
+      <div class="line-chips" id="lineChips">
+        <!-- JS로 생성 -->
+      </div>
+    </div>
+  </div>
+  
+  <!-- 범례 -->
+  <div class="legend">
+    <div class="legend-title">범례</div>
+    <div class="legend-item"><span class="dot" style="background:#0052A4"></span> 1호선</div>
+    <div class="legend-item"><span class="dot" style="background:#00A84D"></span> 2호선</div>
+    <div class="legend-item"><span class="dot" style="background:#EF7C1C"></span> 3호선</div>
+    <div class="legend-item"><span class="dot" style="background:#00A5E5"></span> 4호선</div>
+    <div class="legend-item"><span class="dot" style="background:#996CAC"></span> 5호선</div>
+    <div class="legend-item"><span class="dot" style="background:#CD7C2F"></span> 6호선</div>
+    <div class="legend-item"><span class="dot" style="background:#747F00"></span> 7호선</div>
+    <div class="legend-item"><span class="dot" style="background:#E6186C"></span> 8호선</div>
+    <div class="legend-item"><span class="dot" style="background:#BDB092"></span> 9호선</div>
+  </div>
+  
+  <!-- 안내 -->
+  <div class="info-box">
+    <strong>사용 방법</strong><br>
+    1. <a href="https://data.seoul.go.kr" target="_blank">data.seoul.go.kr</a> 가입 후<br>
+    「서울시 지하철 실시간 열차 위치정보」 API 인증키 발급<br>
+    2. 위에 키를 입력하고 <strong>시작</strong> 클릭<br>
+    3. 20초마다 자동 갱신됩니다<br><br>
+    <strong>참고</strong>: KTX·일반열차 실시간 위치는 현재 공개 API가 없어 수도권 지하철만 표시됩니다.
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <script>
+    // ==================== 설정 ====================
+    const LINES = [
+      { name: '1호선', color: '#0052A4' },
+      { name: '2호선', color: '#00A84D' },
+      { name: '3호선', color: '#EF7C1C' },
+      { name: '4호선', color: '#00A5E5' },
+      { name: '5호선', color: '#996CAC' },
+      { name: '6호선', color: '#CD7C2F' },
+      { name: '7호선', color: '#747F00' },
+      { name: '8호선', color: '#E6186C' },
+      { name: '9호선', color: '#BDB092' }
+    ];
+    
+    let selectedLines = new Set(['2호선']); // 기본으로 2호선 선택
+    let updateInterval = null;
+    let trainLayer = null;
+    let map = null;
+    
+    // 주요 역 대략 좌표 (API가 정확한 위경도를 주지 않을 때 사용)
+    // 실제로는 역 코드로 매핑하는 것이 더 정확함
+    const STATION_COORDS = {
+      // 2호선 주요 역 예시 (실제 서비스에서는 전체 역 데이터 필요)
+      '시청': [37.5647, 126.9769],
+      '을지로입구': [37.5660, 126.9826],
+      '을지로3가': [37.5663, 126.9910],
+      '을지로4가': [37.5666, 126.9979],
+      '동대문역사문화공원': [37.5656, 127.0090],
+      '신당': [37.5656, 127.0196],
+      '상왕십리': [37.5644, 127.0294],
+      '왕십리': [37.5612, 127.0370],
+      '한양대': [37.5554, 127.0437],
+      '뚝섬': [37.5472, 127.0473],
+      '성수': [37.5446, 127.0559],
+      '건대입구': [37.5404, 127.0692],
+      '구의': [37.5371, 127.0859],
+      '강변': [37.5351, 127.0947],
+      '잠실나루': [37.5207, 127.1039],
+      '잠실': [37.5133, 127.1001],
+      '잠실새내': [37.5113, 127.0862],
+      '종합운동장': [37.5110, 127.0737],
+      '삼성': [37.5088, 127.0631],
+      '선릉': [37.5045, 127.0490],
+      '역삼': [37.5006, 127.0364],
+      '강남': [37.4979, 127.0276],
+      '교대': [37.4934, 127.0143],
+      '서초': [37.4918, 127.0077],
+      '방배': [37.4814, 126.9976],
+      '사당': [37.4766, 126.9816],
+      '낙성대': [37.4770, 126.9635],
+      '서울대입구': [37.4813, 126.9527],
+      '봉천': [37.4824, 126.9419],
+      '신림': [37.4842, 126.9297],
+      '신대방': [37.4875, 126.9133],
+      '구로디지털단지': [37.4853, 126.9014],
+      '대림': [37.4929, 126.8958],
+      '신도림': [37.5088, 126.8913],
+      '문래': [37.5178, 126.8947],
+      '영등포구청': [37.5251, 126.8966],
+      '당산': [37.5345, 126.9023],
+      '합정': [37.5496, 126.9139],
+      '홍대입구': [37.5572, 126.9240],
+      '신촌': [37.5552, 126.9369],
+      '이대': [37.5567, 126.9460],
+      '아현': [37.5573, 126.9563],
+      '충정로': [37.5597, 126.9635]
+    };
+    
+    // ==================== 초기화 ====================
+    function initMap() {
+      map = L.map('map', {
+        center: [37.55, 126.98], // 서울 중심
+        zoom: 11,
+        zoomControl: true
+      });
+      
+      // OpenStreetMap 타일
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(map);
+      
+      trainLayer = L.layerGroup().addTo(map);
+      
+      // 호선 칩 생성
+      const chipsContainer = document.getElementById('lineChips');
+      LINES.forEach(line => {
+        const chip = document.createElement('div');
+        chip.className = 'chip' + (selectedLines.has(line.name) ? ' active' : '');
+        chip.textContent = line.name;
+        chip.style.borderColor = line.color;
+        chip.onclick = () => toggleLine(line.name, chip);
+        chipsContainer.appendChild(chip);
+      });
+      
+      // 로컬스토리지에서 API 키 복원
+      const savedKey = localStorage.getItem('seoul_subway_api_key');
+      if (savedKey) {
+        document.getElementById('apiKey').value = savedKey;
+      }
+    }
+    
+    function toggleLine(name, chipEl) {
+      if (selectedLines.has(name)) {
+        selectedLines.delete(name);
+        chipEl.classList.remove('active');
+      } else {
+        selectedLines.add(name);
+        chipEl.classList.add('active');
+      }
+    }
+    
+    // ==================== 데이터 가져오기 ====================
+    async function fetchLinePositions(apiKey, lineName) {
+      // 서울시 지하철 실시간 위치 API
+      // 형식: /api/subway/{KEY}/json/realtimePosition/{시작}/{끝}/{호선명}
+      const url = `https://swopenAPI.seoul.go.kr/api/subway/${apiKey}/json/realtimePosition/0/200/${encodeURIComponent(lineName)}`;
+      
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        
+        // 에러 코드 확인
+        if (data.STATUS && data.STATUS.RESULT && data.STATUS.RESULT.CODE !== 'INFO-000') {
+          throw new Error(data.STATUS.RESULT.MESSAGE || 'API 오류');
+        }
+        
+        // 실제 데이터 위치는 버전에 따라 다를 수 있음
+        const list = data.realtimePositionList || data.row || [];
+        return list;
+      } catch (err) {
+        console.warn(`${lineName} 조회 실패:`, err.message);
+        return [];
+      }
+    }
+    
+    async function updateTrains() {
+      const apiKey = document.getElementById('apiKey').value.trim();
+      if (!apiKey) {
+        setStatus('API 키를 입력해주세요', 'error');
+        return;
+      }
+      
+      // 키 저장
+      localStorage.setItem('seoul_subway_api_key', apiKey);
+      
+      setStatus('데이터 불러오는 중...', 'loading');
+      
+      trainLayer.clearLayers();
+      let totalTrains = 0;
+      
+      const promises = Array.from(selectedLines).map(async (lineName) => {
+        const trains = await fetchLinePositions(apiKey, lineName);
+        const lineInfo = LINES.find(l => l.name === lineName);
+        
+        trains.forEach(train => {
+          // API 응답 필드명은 실제 확인 필요 (일반적인 필드 가정)
+          // subwayNm, trainNo, statnNm, updnLine, trainSttus 등
+          const stationName = train.statnNm || train.stationName || train.statnId || '';
+          const trainNo = train.trainNo || train.trainNumber || '?';
+          const updn = train.updnLine === '0' ? '상행' : (train.updnLine === '1' ? '하행' : '');
+          const status = train.trainSttus || train.status || '';
+          
+          // 좌표 찾기
+          let lat = parseFloat(train.statnLat || train.lat || train.gpsY);
+          let lng = parseFloat(train.statnLon || train.lng || train.gpsX);
+          
+          // API에 좌표가 없으면 역 이름 매핑 시도
+          if (isNaN(lat) || isNaN(lng)) {
+            const coords = STATION_COORDS[stationName.replace(/\(.*\)/, '').trim()];
+            if (coords) {
+              lat = coords[0];
+              lng = coords[1];
+              // 약간의 랜덤 오프셋으로 겹침 방지
+              lat += (Math.random() - 0.5) * 0.002;
+              lng += (Math.random() - 0.5) * 0.002;
+            } else {
+              return; // 좌표 없으면 스킵
+            }
+          }
+          
+          const marker = L.circleMarker([lat, lng], {
+            radius: 7,
+            fillColor: lineInfo ? lineInfo.color : '#666',
+            color: '#fff',
+            weight: 1.5,
+            opacity: 1,
+            fillOpacity: 0.9
+          });
+          
+          marker.bindPopup(`
+            <div class="train-popup">
+              <strong>${lineName} ${trainNo}호</strong><br>
+              현재 위치: ${stationName}<br>
+              ${updn ? updn + '<br>' : ''}
+              ${status ? '상태: ' + status : ''}
+            </div>
+          `);
+          
+          marker.addTo(trainLayer);
+          totalTrains++;
+        });
+      });
+      
+      await Promise.all(promises);
+      
+      if (totalTrains > 0) {
+        setStatus(`정상 작동 중 · ${totalTrains}개 열차 표시 · ${new Date().toLocaleTimeString('ko-KR')}`, 'ok');
+      } else {
+        setStatus('열차 데이터를 가져오지 못했습니다. API 키와 호선 선택을 확인하세요.', 'error');
+      }
+    }
+    
+    function setStatus(msg, type) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = 'status ' + (type || '');
+    }
+    
+    function startTracking() {
+      stopTracking();
+      updateTrains();
+      updateInterval = setInterval(updateTrains, 20000); // 20초마다
+    }
+    
+    function stopTracking() {
+      if (updateInterval) {
+        clearInterval(updateInterval);
+        updateInterval = null;
+      }
+      setStatus('중지됨', '');
+    }
+    
+    // ==================== 시작 ====================
+    document.addEventListener('DOMContentLoaded', initMap);
+  </script>
+</body>
+</html>
