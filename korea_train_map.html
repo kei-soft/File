@@ -4,269 +4,93 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>한국 지하철 실시간 위치 지도</title>
-  
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
-      background: #1a1a2e;
-      color: #eee;
-      height: 100vh;
-      overflow: hidden;
+      background: #1a1a2e; color: #eee; height: 100vh; overflow: hidden;
     }
+    #map { width: 100%; height: 100%; z-index: 1; }
     
-    #map {
-      width: 100%;
-      height: 100%;
-      z-index: 1;
-    }
-    
-    /* 상단 컨트롤 패널 */
     .control-panel {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      z-index: 1000;
-      background: rgba(20, 20, 40, 0.92);
-      backdrop-filter: blur(10px);
-      border-radius: 12px;
-      padding: 16px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      max-width: 340px;
-      border: 1px solid rgba(255,255,255,0.1);
+      position: absolute; top: 12px; left: 12px; z-index: 1000;
+      background: rgba(20, 20, 40, 0.93); backdrop-filter: blur(10px);
+      border-radius: 12px; padding: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      max-width: 360px; border: 1px solid rgba(255,255,255,0.1);
     }
-    
     .control-panel h1 {
-      font-size: 16px;
-      margin-bottom: 8px;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-size: 16px; margin-bottom: 8px; color: #fff;
+      display: flex; align-items: center; gap: 8px;
     }
-    
-    .control-panel h1 span {
-      font-size: 20px;
-    }
-    
-    .status {
-      font-size: 12px;
-      color: #aaa;
-      margin-bottom: 12px;
-      line-height: 1.4;
-    }
-    
+    .status { font-size: 12px; color: #aaa; margin-bottom: 12px; line-height: 1.4; }
     .status.ok { color: #4ade80; }
     .status.error { color: #f87171; }
     .status.loading { color: #fbbf24; }
     
-    .api-section {
-      margin-bottom: 12px;
-    }
-    
-    .api-section label {
-      display: block;
-      font-size: 12px;
-      color: #bbb;
-      margin-bottom: 4px;
-    }
-    
+    .api-section { margin-bottom: 12px; }
+    .api-section label { display: block; font-size: 12px; color: #bbb; margin-bottom: 4px; }
     .api-section input {
-      width: 100%;
-      padding: 8px 10px;
-      border: 1px solid #444;
-      border-radius: 6px;
-      background: #0f0f1a;
-      color: #fff;
-      font-size: 13px;
+      width: 100%; padding: 8px 10px; border: 1px solid #444; border-radius: 6px;
+      background: #0f0f1a; color: #fff; font-size: 13px;
     }
+    .api-section input:focus { outline: none; border-color: #3b82f6; }
     
-    .api-section input:focus {
-      outline: none;
-      border-color: #3b82f6;
-    }
-    
-    .btn-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    
+    .btn-row { display: flex; gap: 8px; margin-top: 8px; }
     button {
-      flex: 1;
-      padding: 8px 12px;
-      border: none;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
+      flex: 1; padding: 8px 12px; border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;
     }
+    .btn-primary { background: #3b82f6; color: white; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-secondary { background: #374151; color: #e5e7eb; }
+    .btn-secondary:hover { background: #4b5563; }
     
-    .btn-primary {
-      background: #3b82f6;
-      color: white;
-    }
-    
-    .btn-primary:hover {
-      background: #2563eb;
-    }
-    
-    .btn-secondary {
-      background: #374151;
-      color: #e5e7eb;
-    }
-    
-    .btn-secondary:hover {
-      background: #4b5563;
-    }
-    
-    /* 호선 선택 */
-    .line-select {
-      margin-top: 12px;
-    }
-    
-    .line-select label {
-      font-size: 12px;
-      color: #bbb;
-      display: block;
-      margin-bottom: 6px;
-    }
-    
-    .line-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    
+    .line-select { margin-top: 12px; }
+    .line-select label { font-size: 12px; color: #bbb; display: block; margin-bottom: 6px; }
+    .line-chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .chip {
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 12px;
-      cursor: pointer;
-      border: 1px solid #444;
-      background: #1f2937;
-      color: #ccc;
-      transition: all 0.15s;
-      user-select: none;
+      padding: 4px 10px; border-radius: 20px; font-size: 12px; cursor: pointer;
+      border: 1px solid #444; background: #1f2937; color: #ccc; transition: all 0.15s; user-select: none;
     }
+    .chip.active { background: #3b82f6; border-color: #3b82f6; color: white; }
+    .chip:hover { border-color: #6b7280; }
     
-    .chip.active {
-      background: #3b82f6;
-      border-color: #3b82f6;
-      color: white;
-    }
-    
-    .chip:hover {
-      border-color: #6b7280;
-    }
-    
-    /* 범례 */
     .legend {
-      position: absolute;
-      bottom: 20px;
-      right: 12px;
-      z-index: 1000;
-      background: rgba(20, 20, 40, 0.9);
-      padding: 12px 16px;
-      border-radius: 10px;
-      font-size: 12px;
-      border: 1px solid rgba(255,255,255,0.1);
+      position: absolute; bottom: 20px; right: 12px; z-index: 1000;
+      background: rgba(20, 20, 40, 0.9); padding: 12px 16px; border-radius: 10px;
+      font-size: 12px; border: 1px solid rgba(255,255,255,0.1);
     }
+    .legend-title { font-weight: 600; margin-bottom: 6px; color: #fff; }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin: 3px 0; color: #ccc; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
     
-    .legend-title {
-      font-weight: 600;
-      margin-bottom: 6px;
-      color: #fff;
-    }
-    
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 3px 0;
-      color: #ccc;
-    }
-    
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-    
-    /* 안내 박스 */
     .info-box {
-      position: absolute;
-      bottom: 20px;
-      left: 12px;
-      z-index: 1000;
-      background: rgba(20, 20, 40, 0.92);
-      padding: 14px 16px;
-      border-radius: 10px;
-      font-size: 12px;
-      max-width: 300px;
-      line-height: 1.5;
-      border: 1px solid rgba(255,255,255,0.1);
-      color: #bbb;
+      position: absolute; bottom: 20px; left: 12px; z-index: 1000;
+      background: rgba(20, 20, 40, 0.92); padding: 14px 16px; border-radius: 10px;
+      font-size: 12px; max-width: 300px; line-height: 1.5;
+      border: 1px solid rgba(255,255,255,0.1); color: #bbb;
     }
+    .info-box strong { color: #fff; }
     
-    .info-box strong {
-      color: #fff;
-    }
+    .leaflet-popup-content { margin: 10px 12px; font-size: 13px; line-height: 1.45; }
     
-    .info-box a {
-      color: #60a5fa;
-      text-decoration: none;
-    }
-    
-    .info-box a:hover {
-      text-decoration: underline;
-    }
-    
-    /* 열차 팝업 스타일 */
-    .leaflet-popup-content {
-      margin: 10px 12px;
-      font-size: 13px;
-      line-height: 1.45;
-    }
-    
-    .train-popup strong {
-      color: #1e40af;
-    }
-    
-    /* 반응형 */
     @media (max-width: 600px) {
-      .control-panel {
-        max-width: calc(100% - 24px);
-        padding: 12px;
-      }
-      .info-box {
-        display: none;
-      }
+      .control-panel { max-width: calc(100% - 24px); }
+      .info-box { display: none; }
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
   
-  <!-- 컨트롤 패널 -->
   <div class="control-panel">
     <h1><span>🚄</span> 한국 지하철 실시간 위치</h1>
-    <div id="status" class="status">API 키를 입력하고 시작 버튼을 눌러주세요</div>
+    <div id="status" class="status">API 키가 입력되어 있습니다. 시작 버튼을 눌러주세요</div>
     
     <div class="api-section">
       <label for="apiKey">서울 열린데이터광장 API 키</label>
-      <input type="text" id="apiKey" placeholder="발급받은 인증키를 붙여넣으세요" autocomplete="off">
+      <input type="text" id="apiKey" value="6b495964586a756e3635624a786259" autocomplete="off">
       <div class="btn-row">
         <button class="btn-primary" onclick="startTracking()">시작 / 갱신</button>
         <button class="btn-secondary" onclick="stopTracking()">중지</button>
@@ -274,14 +98,11 @@
     </div>
     
     <div class="line-select">
-      <label>표시할 호선 선택</label>
-      <div class="line-chips" id="lineChips">
-        <!-- JS로 생성 -->
-      </div>
+      <label>표시할 호선 선택 (여러 개 가능)</label>
+      <div class="line-chips" id="lineChips"></div>
     </div>
   </div>
   
-  <!-- 범례 -->
   <div class="legend">
     <div class="legend-title">범례</div>
     <div class="legend-item"><span class="dot" style="background:#0052A4"></span> 1호선</div>
@@ -295,22 +116,157 @@
     <div class="legend-item"><span class="dot" style="background:#BDB092"></span> 9호선</div>
   </div>
   
-  <!-- 안내 -->
   <div class="info-box">
-    <strong>사용 방법</strong><br>
-    1. <a href="https://data.seoul.go.kr" target="_blank">data.seoul.go.kr</a> 가입 후<br>
-    「서울시 지하철 실시간 열차 위치정보」 API 인증키 발급<br>
-    2. 위에 키를 입력하고 <strong>시작</strong> 클릭<br>
-    3. 20초마다 자동 갱신됩니다<br><br>
-    <strong>참고</strong>: KTX·일반열차 실시간 위치는 현재 공개 API가 없어 수도권 지하철만 표시됩니다.
+    <strong>안내</strong><br>
+    • API 키가 미리 입력되어 있습니다<br>
+    • <b>시작</b> 버튼을 누르면 실시간 위치가 표시됩니다<br>
+    • 20초마다 자동 갱신<br>
+    • KTX 등 일반열차는 공개 API가 없어 미지원
   </div>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // ==================== 설정 ====================
+    // 주요 역 좌표 (이름 → [lat, lng])
+    const STATION_COORDS = {
+      "소요산":[37.9481,127.0610],"동두천":[37.9275,127.0548],"보산":[37.9137,127.0572],
+      "동두천중앙":[37.9019,127.0563],"지행":[37.8923,127.0557],"덕정":[37.8433,127.0615],
+      "덕계":[37.8185,127.0567],"양주":[37.7749,127.0447],"녹양":[37.7594,127.0423],
+      "가능":[37.7484,127.0442],"의정부":[37.7384,127.0459],"회룡":[37.7245,127.0470],
+      "망월사":[37.7104,127.0475],"도봉산":[37.6893,127.0462],"도봉":[37.6794,127.0455],
+      "방학":[37.6677,127.0442],"창동":[37.6531,127.0479],"녹천":[37.6446,127.0439],
+      "월계":[37.6332,127.0588],"광운대":[37.6233,127.0615],"석계":[37.6151,127.0657],
+      "신이문":[37.6026,127.0673],"외대앞":[37.5963,127.0635],"회기":[37.5895,127.0579],
+      "청량리":[37.5802,127.0470],"제기동":[37.5781,127.0347],"신설동":[37.5753,127.0249],
+      "동묘앞":[37.5732,127.0166],"동대문":[37.5714,127.0095],"종로5가":[37.5709,127.0019],
+      "종로3가":[37.5704,126.9921],"종각":[37.5702,126.9831],"시청":[37.5656,126.9770],
+      "서울역":[37.5547,126.9707],"남영":[37.5410,126.9713],"용산":[37.5300,126.9648],
+      "노량진":[37.5141,126.9424],"대방":[37.5134,126.9264],"신길":[37.5170,126.9172],
+      "영등포":[37.5157,126.9074],"신도림":[37.5089,126.8913],"구로":[37.5032,126.8819],
+      "가산디지털단지":[37.4816,126.8825],"독산":[37.4660,126.8895],"금천구청":[37.4554,126.8950],
+      "석수":[37.4351,126.9022],"관악":[37.4192,126.9086],"안양":[37.4017,126.9227],
+      "명학":[37.3844,126.9336],"금정":[37.3723,126.9434],"군포":[37.3536,126.9485],
+      "당정":[37.3443,126.9483],"의왕":[37.3206,126.9482],"성균관대":[37.3000,126.9708],
+      "화서":[37.2840,126.9896],"수원":[37.2659,126.9995],"세류":[37.2440,127.0138],
+      "병점":[37.2068,127.0327],"세마":[37.1875,127.0432],"오산대":[37.1689,127.0631],
+      "오산":[37.1455,127.0670],"진위":[37.1094,127.0622],"송탄":[37.0754,127.0543],
+      "서정리":[37.0565,127.0528],"평택지제":[37.0190,127.0700],"평택":[36.9907,127.0852],
+      "성환":[36.9160,127.1269],"직산":[36.8706,127.1437],"두정":[36.8337,127.1489],
+      "천안":[36.8100,127.1468],"봉명":[36.8015,127.1358],"쌍용":[36.7937,127.1214],
+      "아산":[36.7920,127.1045],"배방":[36.7775,127.0840],"온양온천":[36.7804,127.0035],
+      "신창":[36.7695,126.9500],
+      "을지로입구":[37.5660,126.9826],"을지로3가":[37.5663,126.9910],"을지로4가":[37.5666,126.9979],
+      "동대문역사문화공원":[37.5656,127.0090],"신당":[37.5656,127.0196],"상왕십리":[37.5644,127.0294],
+      "왕십리":[37.5612,127.0370],"한양대":[37.5554,127.0437],"뚝섬":[37.5472,127.0473],
+      "성수":[37.5446,127.0559],"건대입구":[37.5404,127.0692],"구의":[37.5371,127.0859],
+      "강변":[37.5351,127.0947],"잠실나루":[37.5207,127.1039],"잠실":[37.5133,127.1001],
+      "잠실새내":[37.5113,127.0862],"종합운동장":[37.5110,127.0737],"삼성":[37.5088,127.0631],
+      "선릉":[37.5045,127.0490],"역삼":[37.5006,127.0364],"강남":[37.4979,127.0276],
+      "교대":[37.4934,127.0143],"서초":[37.4918,127.0077],"방배":[37.4814,126.9976],
+      "사당":[37.4766,126.9816],"낙성대":[37.4770,126.9635],"서울대입구":[37.4813,126.9527],
+      "봉천":[37.4824,126.9419],"신림":[37.4842,126.9297],"신대방":[37.4875,126.9133],
+      "구로디지털단지":[37.4853,126.9014],"대림":[37.4929,126.8958],"문래":[37.5178,126.8947],
+      "영등포구청":[37.5251,126.8966],"당산":[37.5345,126.9023],"합정":[37.5496,126.9139],
+      "홍대입구":[37.5572,126.9240],"신촌":[37.5552,126.9369],"이대":[37.5567,126.9460],
+      "아현":[37.5573,126.9563],"충정로":[37.5597,126.9635],
+      "용답":[37.5619,127.0509],"신답":[37.5700,127.0465],"용두":[37.5740,127.0381],
+      "도림천":[37.5145,126.8826],"양천구청":[37.5124,126.8657],"신정네거리":[37.5202,126.8529],
+      "까치산":[37.5317,126.8467],
+      "대화":[37.6761,126.7475],"주엽":[37.6701,126.7613],"정발산":[37.6597,126.7732],
+      "마두":[37.6521,126.7778],"백석":[37.6431,126.7880],"대곡":[37.6316,126.8110],
+      "화정":[37.6346,126.8326],"원당":[37.6532,126.8430],"원흥":[37.6506,126.8730],
+      "삼송":[37.6531,126.8956],"지축":[37.6480,126.9139],"구파발":[37.6367,126.9188],
+      "연신내":[37.6190,126.9212],"불광":[37.6105,126.9298],"녹번":[37.6009,126.9357],
+      "홍제":[37.5890,126.9437],"무악재":[37.5822,126.9503],"독립문":[37.5744,126.9579],
+      "경복궁":[37.5758,126.9735],"안국":[37.5765,126.9854],"동대입구":[37.5591,127.0055],
+      "약수":[37.5543,127.0106],"금호":[37.5480,127.0158],"옥수":[37.5407,127.0187],
+      "압구정":[37.5271,127.0285],"신사":[37.5163,127.0201],"잠원":[37.5129,127.0115],
+      "고속터미널":[37.5048,127.0049],"남부터미널":[37.4850,127.0162],"양재":[37.4841,127.0344],
+      "매봉":[37.4869,127.0467],"도곡":[37.4909,127.0554],"대치":[37.4945,127.0635],
+      "학여울":[37.4966,127.0707],"대청":[37.4935,127.0795],"일원":[37.4837,127.0843],
+      "수서":[37.4876,127.1018],"가락시장":[37.4925,127.1182],"경찰병원":[37.4959,127.1242],
+      "오금":[37.5021,127.1282],
+      "당고개":[37.6703,127.0792],"상계":[37.6605,127.0732],"노원":[37.6563,127.0634],
+      "쌍문":[37.6485,127.0347],"수유":[37.6381,127.0257],
+      "미아":[37.6265,127.0259],"미아사거리":[37.6133,127.0300],"길음":[37.6031,127.0250],
+      "성신여대입구":[37.5927,127.0164],"한성대입구":[37.5884,127.0062],"혜화":[37.5822,127.0018],
+      "충무로":[37.5612,126.9942],"명동":[37.5609,126.9863],
+      "회현":[37.5585,126.9784],"숙대입구":[37.5446,126.9721],"삼각지":[37.5345,126.9730],
+      "신용산":[37.5292,126.9679],"이촌":[37.5225,126.9741],"동작":[37.5029,126.9803],
+      "총신대입구":[37.4863,126.9819],"남태령":[37.4637,126.9892],"선바위":[37.4519,127.0022],
+      "경마공원":[37.4439,127.0074],"대공원":[37.4357,127.0065],"과천":[37.4332,126.9965],
+      "정부과천청사":[37.4265,126.9898],"인덕원":[37.3998,126.9767],"평촌":[37.3943,126.9639],
+      "범계":[37.3897,126.9508],"산본":[37.3580,126.9332],
+      "수리산":[37.3499,126.9255],"대야미":[37.3283,126.9173],"반월":[37.3122,126.9036],
+      "상록수":[37.3028,126.8664],"한대앞":[37.3097,126.8537],"중앙":[37.3159,126.8384],
+      "고잔":[37.3168,126.8231],"초지":[37.3206,126.8057],"안산":[37.3270,126.7886],
+      "신길온천":[37.3382,126.7671],"정왕":[37.3518,126.7429],"오이도":[37.3617,126.7384],
+      "방화":[37.5775,126.8126],"개화산":[37.5724,126.8069],"김포공항":[37.5624,126.8013],
+      "송정":[37.5615,126.8119],"마곡":[37.5602,126.8254],"발산":[37.5585,126.8377],
+      "우장산":[37.5488,126.8363],"화곡":[37.5416,126.8404],
+      "신정":[37.5250,126.8562],"목동":[37.5263,126.8649],"오목교":[37.5245,126.8751],
+      "양평":[37.5255,126.8860],"영등포시장":[37.5227,126.9051],
+      "여의도":[37.5216,126.9243],"여의나루":[37.5271,126.9328],
+      "마포":[37.5396,126.9459],"공덕":[37.5444,126.9517],"애오개":[37.5535,126.9568],
+      "서대문":[37.5658,126.9666],"광화문":[37.5716,126.9764],
+      "청구":[37.5603,127.0138],"신금호":[37.5547,127.0201],"행당":[37.5573,127.0295],
+      "마장":[37.5661,127.0429],"답십리":[37.5667,127.0524],
+      "장한평":[37.5614,127.0646],"군자":[37.5571,127.0795],"아차산":[37.5520,127.0896],
+      "광나루":[37.5453,127.1032],"천호":[37.5385,127.1238],"강동":[37.5359,127.1322],
+      "길동":[37.5378,127.1400],"굽은다리":[37.5455,127.1429],"명일":[37.5514,127.1460],
+      "고덕":[37.5550,127.1541],"상일동":[37.5567,127.1664],"강일":[37.5575,127.1750],
+      "미사":[37.5607,127.1930],"하남풍산":[37.5520,127.2036],"하남시청":[37.5417,127.2069],
+      "하남검단산":[37.5397,127.2235],
+      "둔촌동":[37.5276,127.1362],"올림픽공원":[37.5161,127.1309],"방이":[37.5088,127.1261],
+      "개롱":[37.4981,127.1348],"거여":[37.4931,127.1439],"마천":[37.4950,127.1527],
+      "응암":[37.5985,126.9156],"역촌":[37.6063,126.9228],
+      "독바위":[37.6184,126.9330],"구산":[37.6113,126.9172],
+      "새절":[37.5910,126.9136],"증산":[37.5839,126.9097],"디지털미디어시티":[37.5765,126.9000],
+      "월드컵경기장":[37.5698,126.8992],"마포구청":[37.5635,126.9033],"망원":[37.5560,126.9102],
+      "상수":[37.5477,126.9228],"광흥창":[37.5475,126.9319],
+      "대흥":[37.5477,126.9421],"효창공원앞":[37.5393,126.9614],
+      "녹사평":[37.5346,126.9866],"이태원":[37.5345,126.9946],
+      "한강진":[37.5295,127.0090],"버티고개":[37.5481,127.0071],
+      "창신":[37.5794,127.0152],"보문":[37.5853,127.0194],"안암":[37.5863,127.0291],
+      "고려대":[37.5905,127.0363],"월곡":[37.6019,127.0415],"상월곡":[37.6064,127.0489],
+      "돌곶이":[37.6105,127.0563],"태릉입구":[37.6179,127.0751],
+      "화랑대":[37.6200,127.0844],"봉화산":[37.6173,127.0914],"신내":[37.6129,127.1032],
+      "장암":[37.7001,127.0532],"수락산":[37.6778,127.0553],
+      "마들":[37.6650,127.0576],"중계":[37.6446,127.0641],
+      "하계":[37.6363,127.0679],"공릉":[37.6256,127.0729],
+      "먹골":[37.6106,127.0777],"중화":[37.6025,127.0793],"상봉":[37.5965,127.0852],
+      "면목":[37.5886,127.0875],"사가정":[37.5809,127.0883],"용마산":[37.5736,127.0868],
+      "중곡":[37.5658,127.0843],"어린이대공원":[37.5479,127.0745],
+      "뚝섬유원지":[37.5315,127.0667],"청담":[37.5194,127.0537],
+      "강남구청":[37.5171,127.0413],"학동":[37.5142,127.0317],"논현":[37.5111,127.0214],
+      "반포":[37.5081,127.0116],"내방":[37.4876,126.9935],
+      "이수":[37.4867,126.9822],"남성":[37.4846,126.9711],"숭실대입구":[37.4963,126.9537],
+      "상도":[37.5028,126.9479],"장승배기":[37.5049,126.9391],"신대방삼거리":[37.4997,126.9281],
+      "보라매":[37.4999,126.9204],"신풍":[37.5001,126.9099],
+      "남구로":[37.4861,126.8873],"철산":[37.4761,126.8679],
+      "광명사거리":[37.4793,126.8548],"천왕":[37.4867,126.8387],"온수":[37.4920,126.8234],
+      "까치울":[37.5062,126.8108],"부천종합운동장":[37.5054,126.7973],"춘의":[37.5037,126.7870],
+      "신중동":[37.5031,126.7759],"부천시청":[37.5046,126.7635],"상동":[37.5057,126.7531],
+      "삼산체육관":[37.5067,126.7420],"굴포천":[37.5069,126.7314],"부평구청":[37.5084,126.7205],
+      "암사":[37.5501,127.1275],"강동구청":[37.5304,127.1205],
+      "몽촌토성":[37.5177,127.1127],"석촌":[37.5054,127.1069],
+      "송파":[37.5019,127.1122],"문정":[37.4859,127.1225],
+      "장지":[37.4786,127.1262],"복정":[37.4703,127.1267],"남위례":[37.4627,127.1392],
+      "산성":[37.4570,127.1499],"남한산성입구":[37.4515,127.1597],"단대오거리":[37.4450,127.1567],
+      "신흥":[37.4409,127.1474],"수진":[37.4374,127.1407],"모란":[37.4321,127.1291],
+      "개화":[37.5786,126.7981],"공항시장":[37.5637,126.8106],
+      "신방화":[37.5675,126.8176],"마곡나루":[37.5668,126.8273],"양천향교":[37.5681,126.8419],
+      "가양":[37.5614,126.8543],"증미":[37.5578,126.8619],"등촌":[37.5507,126.8657],
+      "염창":[37.5469,126.8749],"신목동":[37.5443,126.8831],"선유도":[37.5381,126.8936],
+      "국회의사당":[37.5284,126.9178],"샛강":[37.5170,126.9284],
+      "노들":[37.5129,126.9532],"흑석":[37.5090,126.9635],
+      "구반포":[37.5014,126.9872],"신반포":[37.5034,126.9960],
+      "사평":[37.5040,127.0152],"신논현":[37.5047,127.0252],"언주":[37.5073,127.0339],
+      "선정릉":[37.5107,127.0437],"삼성중앙":[37.5130,127.0532],"봉은사":[37.5142,127.0603],
+      "삼전":[37.5049,127.0879],"석촌고분":[37.5025,127.0968],
+      "송파나루":[37.5103,127.1125],"한성백제":[37.5165,127.1162],
+      "둔촌오륜":[37.5193,127.1387],"중앙보훈병원":[37.5292,127.1485]
+    };
+    
     const LINES = [
       { name: '1호선', color: '#0052A4' },
       { name: '2호선', color: '#00A84D' },
@@ -323,127 +279,57 @@
       { name: '9호선', color: '#BDB092' }
     ];
     
-    let selectedLines = new Set(['2호선']); // 기본으로 2호선 선택
+    let selectedLines = new Set(['2호선']);
     let updateInterval = null;
     let trainLayer = null;
     let map = null;
     
-    // 주요 역 대략 좌표 (API가 정확한 위경도를 주지 않을 때 사용)
-    // 실제로는 역 코드로 매핑하는 것이 더 정확함
-    const STATION_COORDS = {
-      // 2호선 주요 역 예시 (실제 서비스에서는 전체 역 데이터 필요)
-      '시청': [37.5647, 126.9769],
-      '을지로입구': [37.5660, 126.9826],
-      '을지로3가': [37.5663, 126.9910],
-      '을지로4가': [37.5666, 126.9979],
-      '동대문역사문화공원': [37.5656, 127.0090],
-      '신당': [37.5656, 127.0196],
-      '상왕십리': [37.5644, 127.0294],
-      '왕십리': [37.5612, 127.0370],
-      '한양대': [37.5554, 127.0437],
-      '뚝섬': [37.5472, 127.0473],
-      '성수': [37.5446, 127.0559],
-      '건대입구': [37.5404, 127.0692],
-      '구의': [37.5371, 127.0859],
-      '강변': [37.5351, 127.0947],
-      '잠실나루': [37.5207, 127.1039],
-      '잠실': [37.5133, 127.1001],
-      '잠실새내': [37.5113, 127.0862],
-      '종합운동장': [37.5110, 127.0737],
-      '삼성': [37.5088, 127.0631],
-      '선릉': [37.5045, 127.0490],
-      '역삼': [37.5006, 127.0364],
-      '강남': [37.4979, 127.0276],
-      '교대': [37.4934, 127.0143],
-      '서초': [37.4918, 127.0077],
-      '방배': [37.4814, 126.9976],
-      '사당': [37.4766, 126.9816],
-      '낙성대': [37.4770, 126.9635],
-      '서울대입구': [37.4813, 126.9527],
-      '봉천': [37.4824, 126.9419],
-      '신림': [37.4842, 126.9297],
-      '신대방': [37.4875, 126.9133],
-      '구로디지털단지': [37.4853, 126.9014],
-      '대림': [37.4929, 126.8958],
-      '신도림': [37.5088, 126.8913],
-      '문래': [37.5178, 126.8947],
-      '영등포구청': [37.5251, 126.8966],
-      '당산': [37.5345, 126.9023],
-      '합정': [37.5496, 126.9139],
-      '홍대입구': [37.5572, 126.9240],
-      '신촌': [37.5552, 126.9369],
-      '이대': [37.5567, 126.9460],
-      '아현': [37.5573, 126.9563],
-      '충정로': [37.5597, 126.9635]
-    };
-    
-    // ==================== 초기화 ====================
     function initMap() {
-      map = L.map('map', {
-        center: [37.55, 126.98], // 서울 중심
-        zoom: 11,
-        zoomControl: true
-      });
-      
-      // OpenStreetMap 타일
+      map = L.map('map', { center: [37.55, 126.98], zoom: 11 });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        maxZoom: 19, attribution: '&copy; OpenStreetMap'
       }).addTo(map);
-      
       trainLayer = L.layerGroup().addTo(map);
       
-      // 호선 칩 생성
       const chipsContainer = document.getElementById('lineChips');
       LINES.forEach(line => {
         const chip = document.createElement('div');
         chip.className = 'chip' + (selectedLines.has(line.name) ? ' active' : '');
         chip.textContent = line.name;
         chip.style.borderColor = line.color;
-        chip.onclick = () => toggleLine(line.name, chip);
+        chip.onclick = () => {
+          if (selectedLines.has(line.name)) {
+            selectedLines.delete(line.name);
+            chip.classList.remove('active');
+          } else {
+            selectedLines.add(line.name);
+            chip.classList.add('active');
+          }
+        };
         chipsContainer.appendChild(chip);
       });
-      
-      // 로컬스토리지에서 API 키 복원
-      const savedKey = localStorage.getItem('seoul_subway_api_key');
-      if (savedKey) {
-        document.getElementById('apiKey').value = savedKey;
-      }
     }
     
-    function toggleLine(name, chipEl) {
-      if (selectedLines.has(name)) {
-        selectedLines.delete(name);
-        chipEl.classList.remove('active');
-      } else {
-        selectedLines.add(name);
-        chipEl.classList.add('active');
-      }
-    }
-    
-    // ==================== 데이터 가져오기 ====================
     async function fetchLinePositions(apiKey, lineName) {
-      // 서울시 지하철 실시간 위치 API
-      // 형식: /api/subway/{KEY}/json/realtimePosition/{시작}/{끝}/{호선명}
-      const url = `https://swopenAPI.seoul.go.kr/api/subway/${apiKey}/json/realtimePosition/0/200/${encodeURIComponent(lineName)}`;
-      
+      const url = `http://swopenAPI.seoul.go.kr/api/subway/${apiKey}/json/realtimePosition/0/200/${encodeURIComponent(lineName)}`;
       try {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        
-        // 에러 코드 확인
-        if (data.STATUS && data.STATUS.RESULT && data.STATUS.RESULT.CODE !== 'INFO-000') {
-          throw new Error(data.STATUS.RESULT.MESSAGE || 'API 오류');
+        if (data.errorMessage && data.errorMessage.code !== 'INFO-000') {
+          throw new Error(data.errorMessage.message || 'API 오류');
         }
-        
-        // 실제 데이터 위치는 버전에 따라 다를 수 있음
-        const list = data.realtimePositionList || data.row || [];
-        return list;
+        return data.realtimePositionList || [];
       } catch (err) {
-        console.warn(`${lineName} 조회 실패:`, err.message);
+        console.warn(lineName + ' 조회 실패:', err.message);
         return [];
       }
+    }
+    
+    function getStationCoords(stationName) {
+      if (!stationName) return null;
+      const clean = stationName.replace(/\(.*?\)/g, '').trim();
+      return STATION_COORDS[clean] || STATION_COORDS[stationName] || null;
     }
     
     async function updateTrains() {
@@ -453,12 +339,9 @@
         return;
       }
       
-      // 키 저장
-      localStorage.setItem('seoul_subway_api_key', apiKey);
-      
       setStatus('데이터 불러오는 중...', 'loading');
-      
       trainLayer.clearLayers();
+      
       let totalTrains = 0;
       
       const promises = Array.from(selectedLines).map(async (lineName) => {
@@ -466,46 +349,34 @@
         const lineInfo = LINES.find(l => l.name === lineName);
         
         trains.forEach(train => {
-          // API 응답 필드명은 실제 확인 필요 (일반적인 필드 가정)
-          // subwayNm, trainNo, statnNm, updnLine, trainSttus 등
-          const stationName = train.statnNm || train.stationName || train.statnId || '';
-          const trainNo = train.trainNo || train.trainNumber || '?';
+          const stationName = train.statnNm || '';
+          const trainNo = train.trainNo || '?';
           const updn = train.updnLine === '0' ? '상행' : (train.updnLine === '1' ? '하행' : '');
-          const status = train.trainSttus || train.status || '';
+          const statusCode = train.trainSttus;
+          const statusText = statusCode === '0' ? '진입' : (statusCode === '1' ? '도착' : (statusCode === '2' ? '출발' : statusCode));
+          const dest = train.statnTnm || '';
           
-          // 좌표 찾기
-          let lat = parseFloat(train.statnLat || train.lat || train.gpsY);
-          let lng = parseFloat(train.statnLon || train.lng || train.gpsX);
+          const coords = getStationCoords(stationName);
+          if (!coords) return;
           
-          // API에 좌표가 없으면 역 이름 매핑 시도
-          if (isNaN(lat) || isNaN(lng)) {
-            const coords = STATION_COORDS[stationName.replace(/\(.*\)/, '').trim()];
-            if (coords) {
-              lat = coords[0];
-              lng = coords[1];
-              // 약간의 랜덤 오프셋으로 겹침 방지
-              lat += (Math.random() - 0.5) * 0.002;
-              lng += (Math.random() - 0.5) * 0.002;
-            } else {
-              return; // 좌표 없으면 스킵
-            }
-          }
+          const lat = coords[0] + (Math.random() - 0.5) * 0.0015;
+          const lng = coords[1] + (Math.random() - 0.5) * 0.0015;
           
           const marker = L.circleMarker([lat, lng], {
-            radius: 7,
+            radius: 8,
             fillColor: lineInfo ? lineInfo.color : '#666',
             color: '#fff',
-            weight: 1.5,
+            weight: 2,
             opacity: 1,
             fillOpacity: 0.9
           });
           
           marker.bindPopup(`
-            <div class="train-popup">
-              <strong>${lineName} ${trainNo}호</strong><br>
-              현재 위치: ${stationName}<br>
-              ${updn ? updn + '<br>' : ''}
-              ${status ? '상태: ' + status : ''}
+            <div>
+              <strong style="color:${lineInfo ? lineInfo.color : '#333'}">${lineName} ${trainNo}호</strong><br>
+              현재 역: <b>${stationName}</b><br>
+              ${updn ? updn + ' · ' : ''}${statusText}<br>
+              ${dest ? '행선: ' + dest : ''}
             </div>
           `);
           
@@ -517,9 +388,9 @@
       await Promise.all(promises);
       
       if (totalTrains > 0) {
-        setStatus(`정상 작동 중 · ${totalTrains}개 열차 표시 · ${new Date().toLocaleTimeString('ko-KR')}`, 'ok');
+        setStatus(`정상 · ${totalTrains}개 열차 표시 · ${new Date().toLocaleTimeString('ko-KR')}`, 'ok');
       } else {
-        setStatus('열차 데이터를 가져오지 못했습니다. API 키와 호선 선택을 확인하세요.', 'error');
+        setStatus('열차 데이터를 가져오지 못했습니다. 호선 선택과 네트워크를 확인하세요.', 'error');
       }
     }
     
@@ -532,7 +403,7 @@
     function startTracking() {
       stopTracking();
       updateTrains();
-      updateInterval = setInterval(updateTrains, 20000); // 20초마다
+      updateInterval = setInterval(updateTrains, 20000);
     }
     
     function stopTracking() {
@@ -543,7 +414,6 @@
       setStatus('중지됨', '');
     }
     
-    // ==================== 시작 ====================
     document.addEventListener('DOMContentLoaded', initMap);
   </script>
 </body>
