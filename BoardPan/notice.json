@@ -1,0 +1,12 @@
+{
+  "notices": [
+    {
+      "id": "2026-10-new-version",
+      "title": "신규 버전 안내",
+      "body": "신규버전이 추가되었습니다. 카페를 확인해주세요",
+      "level": "info",
+      "date": "2026-10-17",
+      "url": "https://cafe.naver.com/keisoft"
+    }
+  ]
+}
